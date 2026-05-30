@@ -63,7 +63,7 @@ CuspNet 的每一层都由一个心理学权威公式驱动，形成理论-算�
 
 $$
 \begin{aligned}
-X &\sim \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma}), \quad \text{精度矩阵 } \boldsymbol{\Theta} = \boldsymbol{\Sigma}^{-1} \\[6pt]
+X &\sim \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma}), \quad \text{精度矩阵 } \boldsymbol{\Theta} = \boldsymbol{\Sigma}^{-1} \\
 P(X_1, \ldots, X_p) &= (2\pi)^{-p/2} \, |\boldsymbol{\Theta}|^{1/2} \exp\!\left(-\tfrac{1}{2}(\mathbf{X}-\boldsymbol{\mu})^{\mathsf{T}} \boldsymbol{\Theta} (\mathbf{X}-\boldsymbol{\mu})\right)
 \end{aligned}
 $$
@@ -157,11 +157,11 @@ $$
 & \downarrow & \\
 \text{Luo 公式} & \rightarrow & \text{预测正反馈加深吸引盆} \rightarrow \mathbf{A}\text{ 中的环} \rightarrow \Delta V \text{ 增大} \rightarrow \text{验证 Scheffer 预测} \\
 & \downarrow & \\
-\text{Lazarus 公式} & \rightarrow & \text{约束 LLM 推理} \rightarrow \text{提取 } a \text{ 的认知成分} \rightarrow \text{反馈到 Cusp 参数} \\
-& \downarrow & \\
-\multicolumn{3}{c}{\text{四公式闭环：网络结构}(\mathbf{A}) \rightarrow \text{动力学(ODE)} \rightarrow \text{吸引子}(\Delta V) \rightarrow \text{认知评价}(a) \rightarrow \text{网络结构}}
+\text{Lazarus 公式} & \rightarrow & \text{约束 LLM 推理} \rightarrow \text{提取 } a \text{ 的认知成分} \rightarrow \text{反馈到 Cusp 参数}
 \end{array}
 $$
+
+> **四公式闭环**：网络结构 $(\mathbf{A})$ $\rightarrow$ 动力学(ODE) $\rightarrow$ 吸引子 $(\Delta V)$ $\rightarrow$ 认知评价 $(a)$ $\rightarrow$ 网络结构
 
 **闭环关键步骤的动力学解释**：$\Delta V \to a$ 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
 
@@ -225,7 +225,7 @@ $$
 
 $$
 \begin{aligned}
-V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\[6pt]
+V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\
 \text{韧性储备} &= V(x_{\text{saddle}}) - V(x_{\text{healthy attractor}}) = \Delta V
 \end{aligned}
 $$
@@ -239,32 +239,32 @@ $$
 **创新**：将 Lazarus 的认知评价树设计为 LLM 的多步反思推理流（Chain-of-Thought with Theory-guided Rollback），而非简单的单轮 prompt：
 
 $$
-\begin{array}{ll}
-\textbf{Step 1: Primary Appraisal Agent（初级评价智能体)} & \\
-\quad \text{输入:} & \text{个体文本} \\
-\quad \text{任务:} & \text{识别威胁刺激 + 评估威胁程度 (1-10)} \\
-\quad \text{输出:} & \{\text{threat\_type}, \text{threat\_intensity}, \text{threat\_narrative}\} \\[8pt]
-\textbf{Step 2: Secondary Appraisal Agent（次级评价智能体)} & \\
-\quad \text{输入:} & \text{个体文本 + Step 1 的威胁识别} \\
-\quad \text{任务:} & \text{评估应对资源 + 应对效能 (1-10)} \\
-\quad \text{输出:} & \{\text{coping\_resources}, \text{coping\_efficacy}, \text{resource\_narrative}\} \\[8pt]
-\textbf{Step 3: Reappraisal Agent（再评价智能体）—— Theory-guided Rollback} & \\
-\quad \text{输入:} & \text{Step 1 + Step 2 的输出} \\
-\quad \text{任务:} & \text{检验初级/次级评价的一致性} \\
-\quad \text{约束:} & \text{Lazarus 理论要求 } \text{Stress} = f(\text{Primary} \times \text{Secondary}) \\
-& \text{若 Primary 高但 Secondary 也高} \to \text{压力应低} \to \text{回滚修正} \\
-& \text{若 Primary 低但 Secondary 也低} \to \text{潜在忽视} \to \text{回滚修正} \\
-\quad \text{输出:} & \{\text{reappraisal\_flag}, \text{corrected\_primary}, \text{corrected\_secondary}\} \\[8pt]
-\textbf{Step 4: Cognitive Distortion Agent（认知扭曲检测智能体)} & \\
-\quad \text{输入:} & \text{修正后的评价 + 原始文本} \\
-\quad \text{任务:} & \text{基于 ABC 理论检测认知扭曲} \\
-\quad \text{类型:} & \text{灾难化 / 过度概括 / 非黑即白 / 情绪推理 / 个人化} \\
-\quad \text{输出:} & \{\text{distortion\_type}, \text{distortion\_severity}, \text{evidence}\} \\[8pt]
-\textbf{Step 5: Integration Agent（整合智能体)} & \\
-\quad \text{输入:} & \text{Step 1-4 的全部输出} \\
-\quad \text{任务:} & \text{计算 Cusp 参数代理值} \\
-\quad \text{输出:} & \{a_{\text{proxy}} (\text{威胁-应对差}), \; b_{\text{proxy}} (\text{应对×支持}), \; c_{\text{proxy}} (\text{支持×重评})\}
-\end{array}
+\begin{aligned}
+&\textbf{Step 1: Primary Appraisal Agent（初级评价智能体)} \\
+&\quad \text{输入: 个体文本} \\
+&\quad \text{任务: 识别威胁刺激 + 评估威胁程度 (1-10)} \\
+&\quad \text{输出: } \{\text{threat\_type},\; \text{threat\_intensity},\; \text{threat\_narrative}\} \\
+&\textbf{Step 2: Secondary Appraisal Agent（次级评价智能体)} \\
+&\quad \text{输入: 个体文本 + Step 1 的威胁识别} \\
+&\quad \text{任务: 评估应对资源 + 应对效能 (1-10)} \\
+&\quad \text{输出: } \{\text{coping\_resources},\; \text{coping\_efficacy},\; \text{resource\_narrative}\} \\
+&\textbf{Step 3: Reappraisal Agent（再评价智能体）— Theory-guided Rollback} \\
+&\quad \text{输入: Step 1 + Step 2 的输出} \\
+&\quad \text{任务: 检验初级/次级评价的一致性} \\
+&\quad \text{约束: Lazarus 理论要求 Stress} = f(\text{Primary} \times \text{Secondary}) \\
+&\quad \text{若 Primary 高但 Secondary 也高} \to \text{压力应低} \to \text{回滚修正} \\
+&\quad \text{若 Primary 低但 Secondary 也低} \to \text{潜在忽视} \to \text{回滚修正} \\
+&\quad \text{输出: } \{\text{reappraisal\_flag},\; \text{corrected\_primary},\; \text{corrected\_secondary}\} \\
+&\textbf{Step 4: Cognitive Distortion Agent（认知扭曲检测智能体)} \\
+&\quad \text{输入: 修正后的评价 + 原始文本} \\
+&\quad \text{任务: 基于 ABC 理论检测认知扭曲} \\
+&\quad \text{类型: 灾难化 / 过度概括 / 非黑即白 / 情绪推理 / 个人化} \\
+&\quad \text{输出: } \{\text{distortion\_type},\; \text{distortion\_severity},\; \text{evidence}\} \\
+&\textbf{Step 5: Integration Agent（整合智能体)} \\
+&\quad \text{输入: Step 1-4 的全部输出} \\
+&\quad \text{任务: 计算 Cusp 参数代理值} \\
+&\quad \text{输出: } \{a_{\text{proxy}}\;(\text{威胁-应对差}),\; b_{\text{proxy}}\;(\text{应对×支持}),\; c_{\text{proxy}}\;(\text{支持×重评})\}
+\end{aligned}
 $$
 
 **关键创新**：Step 3 的 Theory-guided Rollback 机制确保 LLM 的推理**必须通过 Lazarus 理论的一致性检验**。如果 LLM 的输出违反了 $\text{Stress} = f(\text{Primary} \times \text{Secondary})$ 的理论约束（例如高威胁+高应对却输出高压力），系统会自动回滚并要求重新评估。这种机制化的理论约束远超简单的 prompt 模板，确保了输出的心理学理论一致性。
