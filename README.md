@@ -61,17 +61,18 @@ CuspNet 的每一层都由一个心理学权威公式驱动，形成理论-算�
 
 由于 CuspNet 使用 EBICglasso 估计偏相关网络，其底层假设是连续变量的多元正态分布（PHQ-9 等量表的 0-3 序数得分在此框架下近似连续），因此公式采用 GGM 标准形式：
 
-```
-X ~ N(μ, Σ),  精度矩阵 Θ = Σ⁻¹
+$$
+\begin{aligned}
+X &\sim \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma}), \quad \text{精度矩阵 } \boldsymbol{\Theta} = \boldsymbol{\Sigma}^{-1} \\[6pt]
+P(X_1, \ldots, X_p) &= (2\pi)^{-p/2} \, |\boldsymbol{\Theta}|^{1/2} \exp\!\left(-\tfrac{1}{2}(\mathbf{X}-\boldsymbol{\mu})^{\mathsf{T}} \boldsymbol{\Theta} (\mathbf{X}-\boldsymbol{\mu})\right)
+\end{aligned}
+$$
 
-P(X₁, ..., Xₚ) = (2π)^{-p/2} |Θ|^{1/2} exp(-½ (X-μ)ᵀ Θ (X-μ))
-```
+其中 $\Theta_{ij} \neq 0$ 当且仅当症状 $i$ 和 $j$ 之间存在偏相关（控制其他所有变量后的条件依赖），这正是 EBICglasso 估计的对象。偏相关矩阵由 $\rho_{ij} = -\Theta_{ij} / \sqrt{\Theta_{ii}\Theta_{jj}}$ 得到。
 
-其中 `Θᵢⱼ ≠ 0` 当且仅当症状 i 和 j 之间存在偏相关（控制其他所有变量后的条件依赖），这正是 EBICglasso 估计的对象。偏相关矩阵由 `ρᵢⱼ = -Θᵢⱼ / √(ΘᵢᵢΘⱼⱼ)` 得到。
+> **注**：若数据为二元变量（症状有/无），则应使用 Ising 模型 $P(\mathbf{X}) \propto \exp(\sum_{i<j} \beta_{ij}X_i X_j + \sum_i \alpha_i X_i)$ 配合 IsingFit（van Borkulo et al., 2014）估计。CuspNet 默认采用 GGM + EBICglasso 处理序数/连续量表数据，但框架兼容 Ising 模型用于二元数据场景。
 
-> **注**：若数据为二元变量（症状有/无），则应使用 Ising 模型 `P(X) ∝ exp(Σᵢ<ⱼ βᵢⱼXᵢXⱼ + Σᵢ αᵢXᵢ)` 配合 IsingFit（van Borkulo et al., 2014）估计。CuspNet 默认采用 GGM + EBICglasso 处理序数/连续量表数据，但框架兼容 Ising 模型用于二元数据场景。
-
-**理论约束**：Borsboom 明确指出，`Θᵢⱼ ≠ 0` 不只是统计关联，而是**因果交互**的候选——"症状之间的因果连接构成了障碍的本质"。
+**理论约束**：Borsboom 明确指出，$\Theta_{ij} \neq 0$ 不只是统计关联，而是**因果交互**的候选——"症状之间的因果连接构成了障碍的本质"。
 
 ### 2.2 公式 2：Scheffer 临界转变公式（驱动 Layer 2）
 
@@ -79,35 +80,37 @@ P(X₁, ..., Xₚ) = (2π)^{-p/2} |Θ|^{1/2} exp(-½ (X-μ)ᵀ Θ (X-μ))
 
 **核心公式**：Cusp 分岔的标准形式
 
-```
-dx/dt = -dV/dx = a + bx - cx³
-```
+$$
+\frac{dx}{dt} = -\frac{dV}{dx} = a + bx - cx^3
+$$
 
 | 参数 | 含义 | 计算方式（Training-free） |
 |------|------|------------------|
-| `x` | 心理状态变量（标准化综合指标） | PHQ-9 + GAD-7 加权合成 |
-| `a` | 不对称因子（压力源 - 保护因子） | `norm(PSS-10 - CD-RISC)` |
-| `b` | 分岔因子（韧性储备 × 自我调节） | `norm(CD-RISC × MSPSS) - θ_bifurcation` |
-| `c` | 自调节强度（社会支持 × 认知重评） | `norm(MSPSS × 认知重评分)` |
+| $x$ | 心理状态变量（标准化综合指标） | PHQ-9 + GAD-7 加权合成 |
+| $a$ | 不对称因子（压力源 - 保护因子） | $\text{norm}(\text{PSS-10} - \text{CD-RISC})$ |
+| $b$ | 分岔因子（韧性储备 × 自我调节） | $\text{norm}(\text{CD-RISC} \times \text{MSPSS}) - \theta_{\text{bifurcation}}$ |
+| $c$ | 自调节强度（社会支持 × 认知重评） | $\text{norm}(\text{MSPSS} \times \text{认知重评分})$ |
 
 **理论预测**：
-- `b > 0`：系统只有一个稳定不动点（健康或病理）
-- `b < 0` 且 `|a| < 2√(|b|³/(27c²))`：系统有**两个稳定不动点**（双稳态）+ 一个不稳定不动点
+- $b > 0$：系统只有一个稳定不动点（健康或病理）
+- $b < 0$ 且 $|a| < 2\sqrt{|b|^3/(27c^2)}$：系统有**两个稳定不动点**（双稳态）+ 一个不稳定不动点
 - **临界转变**：当 a 缓慢增加越过分岔点时，系统突然从健康吸引子跳入病理吸引子
 
 **参数分配机制（Global → Local Allocation）**：
 
-上述 `a, b, c` 是基于宏观量表计算的全局标量。当 ODE 扩展为微观症状级别 `dxᵢ/dt` 时，需要将全局参数分配给各症状节点。CuspNet 采用**中心性加权分配机制**：
+上述 $a, b, c$ 是基于宏观量表计算的全局标量。当 ODE 扩展为微观症状级别 $dx_i/dt$ 时，需要将全局参数分配给各症状节点。CuspNet 采用**中心性加权分配机制**：
 
-```
-aᵢ = a · (1 + λ₁ · centralityᵢ)     ← 高中心性症状承受更大压力
-bᵢ = b · (1 - λ₂ · centralityᵢ)     ← 高中心性症状韧性储备更脆弱
-cᵢ = c · (1 + λ₃ · bridgeᵢ)          ← 桥接症状具有更强的跨簇调节
-```
+$$
+\begin{aligned}
+a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性储备更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状具有更强的跨簇调节}
+\end{aligned}
+$$
 
-其中 `centralityᵢ` 是症状 i 的预期影响中心性（来自 Layer 1 Step 1.4），`bridgeᵢ` 是桥接中心性，`λ₁, λ₂, λ₃` 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
+其中 $\text{centrality}_i$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\text{bridge}_i$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
 
-**心理学依据**：高中心性症状（如"失眠"）既是压力的首要入口（aᵢ 更大），也是韧性最容易崩溃的薄弱环节（bᵢ 更小），这符合 Borsboom (2017) 的核心论断——"中心症状是维持网络病理结构的关键枢纽"。
+**心理学依据**：高中心性症状（如"失眠"）既是压力的首要入口（$a_i$ 更大），也是韧性最容易崩溃的薄弱环节（$b_i$ 更小），这符合 Borsboom (2017) 的核心论断——"中心症状是维持网络病理结构的关键枢纽"。
 
 ### 2.3 公式 3：Lazarus 认知评价公式（驱动 Layer 3）
 
@@ -115,9 +118,9 @@ cᵢ = c · (1 + λ₃ · bridgeᵢ)          ← 桥接症状具有更强的跨
 
 **核心公式**：
 
-```
-Stress Response = f(Primary Appraisal × Secondary Appraisal)
-```
+$$
+\text{Stress Response} = f(\text{Primary Appraisal} \times \text{Secondary Appraisal})
+$$
 
 | 评价类型 | 含义 | 在 CuspNet 中的操作化 |
 |---------|------|---------------------|
@@ -128,13 +131,11 @@ Stress Response = f(Primary Appraisal × Secondary Appraisal)
 
 **来源**：Luo, M. (2026). A circuit-based framework for depression. *Neuron*.
 
-**核心公式**：多尺度正反馈的数学表达
+$$
+\frac{dV_{\text{basin}}}{dt} = \sum_k \alpha_k \cdot \text{feedback}_k(x)
+$$
 
-```
-dV_basin/dt = Σₖ αₖ · feedbackₖ(x)
-```
-
-其中 `V_basin` 是病理吸引盆的深度，`feedbackₖ` 是第 k 个正反馈回路的强度。
+其中 $V_{\text{basin}}$ 是病理吸引盆的深度，$\text{feedback}_k$ 是第 $k$ 个正反馈回路的强度。
 
 **在 CuspNet 中的操作化**：从 EBICglasso 网络中识别正反馈回路（有向环），计算每个环的强度（边权重的几何平均），评估这些环如何加深病理吸引盆。
 
@@ -142,154 +143,32 @@ dV_basin/dt = Σₖ αₖ · feedbackₖ(x)
 
 ## 3. CuspNet 完整架构
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CuspNet: 完整架构                              │
-│                                                                  │
-│  输入：公开数据集 / 学校常规问卷数据                               │
-│  ├── PHQ-9 (9项), GAD-7 (7项), PSS-10 (10项)                   │
-│  ├── CD-RISC-10 (10项), MSPSS (12项)                            │
-│  ├── 学业数据: GPA, 出勤率                                       │
-│  └── 开放式回答 / 临床访谈文本                                    │
-│                                                                  │
-│  ══════════════════════════════════════════════════════════════   │
-│                                                                  │
-│  Layer 1: 网络因果发现层 (Borsboom 公式驱动)                     │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │ Step 1.1: EBICglasso → 偏相关网络 (Training-free)         │    │
-│  │   输入: N个个体的数据矩阵 X ∈ R^{N×p}                   │    │
-│  │   算法: Graphical LASSO + EBIC 模型选择                   │    │
-│  │   输出: 稀疏偏相关矩阵 Θ ∈ R^{p×p}                      │    │
-│  │   文献: Epskamp et al. (2018), Psych Methods             │    │
-│  │                                                          │    │
-│  │ Step 1.2: GES → 因果拓扑排序 (Training-free)              │    │
-│  │   输入: 同一数据矩阵 X                                   │    │
-│  │   算法: Greedy Equivalence Search (BIC评分)               │    │
-│  │         提取 CPDAG → 拓扑排序；备选 BIC exact search      │    │
-│  │   输出: 因果拓扑序 π = (π₁, ..., πₚ)                    │    │
-│  │   文献: Chickering (2002), causal-learn 实现              │    │
-│  │                                                          │    │
-│  │ Step 1.3: 理论约束定向 → 因果 DAG (Training-free)          │    │
-│  │   输入: Θ (偏相关) + π (拓扑序)                          │    │
-│  │   约束: Borsboom 理论 + 交叉滞后 + 中心性排序              │    │
-│  │   输出: 因果邻接矩阵 A ∈ R^{p×p}                        │    │
-│  │                                                          │    │
-│  │ Step 1.4: 网络中心性分析 (Training-free, 纯图论)           │    │
-│  │   计算: 介数中心性, 紧密度中心性, 预期影响                │    │
-│  │   输出: 中心症状排序 + 桥接症状识别                       │    │
-│  │   文献: Robinaugh et al. (2020), Psych Med               │    │
-│  └──────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                    A (因果邻接矩阵)                               │
-│                    中心性排序                                     │
-│                    正反馈回路识别                                  │
-│                           │                                      │
-│                           ▼                                      │
-│  Layer 2: Cusp 分岔动力学层 (Scheffer + Luo 公式驱动)            │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │ Step 2.1: 全局参数估计 + 中心性加权分配 (Training-free)    │    │
-│  │   全局: a = norm(PSS - CD-RISC)    ← 不对称因子          │    │
-│  │         b = norm(CD-RISC × MSPSS) - θ  ← 分岔因子       │    │
-│  │         c = norm(MSPSS × 认知重评) ← 自调节强度          │    │
-│  │   分配: aᵢ = a·(1 + λ₁·centralityᵢ)  ← 中心性加权      │    │
-│  │         bᵢ = b·(1 - λ₂·centralityᵢ)  ← 中心性加权      │    │
-│  │         cᵢ = c·(1 + λ₃·bridgeᵢ)      ← 桥接加权        │    │
-│  │                                                          │    │
-│  │ Step 2.2: 吸引子分析 (Training-free, 解析求解)             │    │
-│  │   dx/dt = a + bx - cx³                                   │    │
-│  │   不动点: 令 dx/dt=0, 解三次方程                         │    │
-│  │   判别式 Δ > 0 → 三个实根 (双稳态)                       │    │
-│  │   判别式 Δ < 0 → 一个实根 (单稳态)                       │    │
-│  │                                                          │    │
-│  │ Step 2.3: 韧性储备量化 (Training-free, 解析计算)           │    │
-│  │   势函数: V(x) = -ax - bx²/2 + cx⁴/4                    │    │
-│  │   势垒高度: ΔV = V(x_saddle) - V(x_attractor)            │    │
-│  │   韧性储备 = ΔV (量化系统距临界转变的距离)                │    │
-│  │                                                          │    │
-│  │ Step 2.4: 因果网络嵌入 ODE (Training-free)                │    │
-│  │   dxᵢ/dt = aᵢ + bᵢxᵢ - cᵢxᵢ³ + Σⱼ Aᵢⱼ·σ(xⱼ - τⱼ)     │    │
-│  │   aᵢ, bᵢ, cᵢ 由 Step 2.1 中心性加权分配得到              │    │
-│  │   Aᵢⱼ 来自 Layer 1 的因果邻接矩阵                        │    │
-│  │   正反馈回路 → 加深病理吸引盆 (Luo 公式)                  │    │
-│  │                                                          │    │
-│  │ Step 2.5: 临界转变预警 (Training-free)                     │    │
-│  │   临界距离 = |b - b_critical| / |b_critical|             │    │
-│  │   b → 0⁺ 时: 两个吸引子即将合并 → 预警                   │    │
-│  └──────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                    吸引子状态                                     │
-│                    韧性储备 ΔV                                    │
-│                    临界距离                                       │
-│                           │                                      │
-│                           ▼                                      │
-│  Layer 3: 零样本 LLM 多步反思推理层 (Lazarus 公式驱动)       │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │ Step 3.1: Primary Appraisal Agent (零样本)                │    │
-│  │   输入: 开放式回答 / 临床访谈文本                         │    │
-│  │   任务: 识别威胁刺激 + 评估威胁程度                       │    │
-│  │   输出: {threat_type, threat_intensity}                   │    │
-│  │                                                          │    │
-│  │ Step 3.2: Secondary Appraisal Agent (零样本)              │    │
-│  │   输入: 文本 + Step 3.1 威胁识别                          │    │
-│  │   任务: 评估应对资源 + 应对效能                           │    │
-│  │   输出: {coping_resources, coping_efficacy}               │    │
-│  │                                                          │    │
-│  │ Step 3.3: Reappraisal Agent (Theory-guided Rollback)      │    │
-│  │   输入: Step 3.1 + 3.2 的输出                             │    │
-│  │   约束: Lazarus Stress = f(Primary × Secondary)           │    │
-│  │   若违反理论一致性 → 回滚修正                             │    │
-│  │   输出: {corrected_primary, corrected_secondary}          │    │
-│  │                                                          │    │
-│  │ Step 3.4: Cognitive Distortion Agent (零样本)             │    │
-│  │   输入: 修正后评价 + 原始文本                             │    │
-│  │   任务: 基于 ABC 理论检测认知扭曲                         │    │
-│  │   输出: {distortion_type, distortion_severity}            │    │
-│  │                                                          │    │
-│  │ Step 3.5: Integration Agent (零样本)                      │    │
-│  │   输入: Step 3.1-3.4 全部输出                             │    │
-│  │   任务: 计算 Cusp 参数代理值 + 生成因果解释 + 干预建议    │    │
-│  │   输出: {a_proxy, b_proxy, c_proxy, 解释报告, 干预方案}   │    │
-│  │   模型: Qwen3.5-2B (本地, 无需量化)                      │    │
-│  │   文献: Kebe et al. (2025), LlaMADRS                     │    │
-│  └──────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
-│  ══════════════════════════════════════════════════════════════   │
-│                                                                  │
-│  输出:                                                           │
-│  ├── 风险评分 (0-1)                                              │
-│  ├── 风险等级 (低/中/高/临界)                                    │
-│  ├── 因果 DAG 可视化                                             │
-│  ├── 吸引子状态图 (势函数 + 当前位置)                            │
-│  ├── 韧性储备量化值 ΔV                                           │
-│  ├── 临界转变预警 (是/否 + 临界距离)                             │
-│  ├── 三重因果解释 (结构 + 动力学 + 机制)                         │
-│  └── 个性化干预建议 (基于中心症状和吸引子状态)                    │
-└─────────────────────────────────────────────────────────────────┘
-```
+![CuspNet 完整架构](backend/app/docs/architecture.png)
 
 ### 3.1 理论-算法共构闭环
 
 四个公式通过数学方程相互约束、相互验证，形成自洽的理论-计算闭环：
 
-```
-Borsboom 公式 → 约束因果网络结构 → 提供因果邻接矩阵 A
-                                          ↓
-Scheffer 公式 → 约束 ODE 方程形式 → dx/dt = a + bx - cx³ + A·σ(x)
-                                          ↓
-Luo 公式 → 预测正反馈加深吸引盆 → A 中的环 → ΔV 增大 → 验证 Scheffer 预测
-                                          ↓
-Lazarus 公式 → 约束 LLM 推理 → 提取 a 的认知成分 → 反馈到 Cusp 参数
-                                          ↓
-四公式闭环：网络结构(A) → 动力学(ODE) → 吸引子(ΔV) → 认知评价(a) → 网络结构
-```
+$$
+\begin{array}{rcl}
+\text{Borsboom 公式} & \rightarrow & \text{约束因果网络结构} \rightarrow \text{提供因果邻接矩阵 } \mathbf{A} \\
+& \downarrow & \\
+\text{Scheffer 公式} & \rightarrow & \text{约束 ODE 方程形式} \rightarrow \displaystyle\frac{dx}{dt} = a + bx - cx^3 + \mathbf{A}\cdot\sigma(x) \\
+& \downarrow & \\
+\text{Luo 公式} & \rightarrow & \text{预测正反馈加深吸引盆} \rightarrow \mathbf{A}\text{ 中的环} \rightarrow \Delta V \text{ 增大} \rightarrow \text{验证 Scheffer 预测} \\
+& \downarrow & \\
+\text{Lazarus 公式} & \rightarrow & \text{约束 LLM 推理} \rightarrow \text{提取 } a \text{ 的认知成分} \rightarrow \text{反馈到 Cusp 参数} \\
+& \downarrow & \\
+\multicolumn{3}{c}{\text{四公式闭环：网络结构}(\mathbf{A}) \rightarrow \text{动力学(ODE)} \rightarrow \text{吸引子}(\Delta V) \rightarrow \text{认知评价}(a) \rightarrow \text{网络结构}}
+\end{array}
+$$
 
-**闭环关键步骤的动力学解释**：`ΔV → a` 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
+**闭环关键步骤的动力学解释**：$\Delta V \to a$ 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
 
 1. 系统陷入病理吸引子（ΔV 坍塌至接近零）意味着个体失去了从病理状态恢复的"势能"
 2. 这种状态坍塌会导致**认知扭曲的固化**——个体的次级评价（应对效能）持续降低，初级评价（威胁感知）持续升高
-3. 在动力学上，这表现为参数 `a` 随时间漂移：`a(t+1) = a(t) + η · ΔV⁻¹ · sign(ΔV → 0)`，即韧性储备越低，不对称因子 a 向病理方向的漂移越快
-4. 漂移后的 `a(t+1)` 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
+3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t+1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \text{sign}(\Delta V \to 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
+4. 漂移后的 $a(t+1)$ 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
 
 这一机制在临床上有明确对应：抑郁患者的"反刍思维"（rumination）正是状态依赖参数演行的表现——低韧性状态→认知扭曲加剧→压力评估升高→韧性进一步降低。
 
@@ -317,24 +196,26 @@ Lazarus 公式 → 约束 LLM 推理 → 提取 a 的认知成分 → 反馈到 
 
 **创新**：将 Layer 1 发现的因果邻接矩阵 A 嵌入 Cusp ODE，并通过中心性加权分配机制将全局参数 a, b, c 分配给各症状节点：
 
-```
-dxᵢ/dt = aᵢ + bᵢxᵢ - cᵢxᵢ³ + Σⱼ Aᵢⱼ · σ(xⱼ - τⱼ)
-```
+$$
+\frac{dx_i}{dt} = a_i + b_i x_i - c_i x_i^3 + \sum_j A_{ij} \cdot \sigma(x_j - \tau_j)
+$$
 
 其中微观参数通过中心性加权分配从全局参数导出：
 
-```
-aᵢ = a · (1 + λ₁ · centralityᵢ)     ← 高中心性症状承受更大压力
-bᵢ = b · (1 - λ₂ · centralityᵢ)     ← 高中心性症状韧性更脆弱
-cᵢ = c · (1 + λ₃ · bridgeᵢ)          ← 桥接症状跨簇调节更强
-```
+$$
+\begin{aligned}
+a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状跨簇调节更强}
+\end{aligned}
+$$
 
 每一项的心理学含义：
-- `aᵢ + bᵢxᵢ - cᵢxᵢ³`：Scheffer 的 Cusp 分岔（个体动力学）
-- `Aᵢⱼ · σ(xⱼ - τⱼ)`：Borsboom 的因果交互（症状间传播）
-- 当 `Aᵢⱼ > 0` 且 `xⱼ > τⱼ`：症状 j "激活"了对症状 i 的因果影响
+- $a_i + b_i x_i - c_i x_i^3$：Scheffer 的 Cusp 分岔（个体动力学）
+- $A_{ij} \cdot \sigma(x_j - \tau_j)$：Borsboom 的因果交互（症状间传播）
+- 当 $A_{ij} > 0$ 且 $x_j > \tau_j$：症状 j "激活"了对症状 i 的因果影响
 
-**关键理论结果**：正反馈回路（`Aᵢⱼ · Aⱼᵢ > 0` 的环）会**加深病理吸引盆**，直接对应 Luo Minmin (2026) 的核心预测——"多尺度正反馈维持病理吸引子"。
+**关键理论结果**：正反馈回路（$A_{ij} \cdot A_{ji} > 0$ 的环）会**加深病理吸引盆**，直接对应 Luo Minmin (2026) 的核心预测——"多尺度正反馈维持病理吸引子"。
 
 ### 创新点 3：韧性储备的解析量化——从定性理论到定量预测
 
@@ -342,13 +223,14 @@ cᵢ = c · (1 + λ₃ · bridgeᵢ)          ← 桥接症状跨簇调节更强
 
 **创新**：利用 Cusp 模型的势函数解析计算韧性储备：
 
-```
-V(x) = -ax - (b/2)x² + (c/4)x⁴
+$$
+\begin{aligned}
+V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\[6pt]
+\text{韧性储备} &= V(x_{\text{saddle}}) - V(x_{\text{healthy attractor}}) = \Delta V
+\end{aligned}
+$$
 
-韧性储备 = V(x_saddle) - V(x_healthy attractor) = ΔV
-```
-
-这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 `ΔV → 0` 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
+这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 $\Delta V \to 0$ 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
 
 ### 创新点 4：Lazarus 理论约束的多步反思认知评价流（Theory-Guided Reflective Appraisal Chain）
 
@@ -356,38 +238,36 @@ V(x) = -ax - (b/2)x² + (c/4)x⁴
 
 **创新**：将 Lazarus 的认知评价树设计为 LLM 的多步反思推理流（Chain-of-Thought with Theory-guided Rollback），而非简单的单轮 prompt：
 
-```
-Step 1: Primary Appraisal Agent（初级评价智能体）
-  输入: 个体文本
-  任务: 识别威胁刺激 + 评估威胁程度 (1-10)
-  输出: {threat_type, threat_intensity, threat_narrative}
+$$
+\begin{array}{ll}
+\textbf{Step 1: Primary Appraisal Agent（初级评价智能体)} & \\
+\quad \text{输入:} & \text{个体文本} \\
+\quad \text{任务:} & \text{识别威胁刺激 + 评估威胁程度 (1-10)} \\
+\quad \text{输出:} & \{\text{threat\_type}, \text{threat\_intensity}, \text{threat\_narrative}\} \\[8pt]
+\textbf{Step 2: Secondary Appraisal Agent（次级评价智能体)} & \\
+\quad \text{输入:} & \text{个体文本 + Step 1 的威胁识别} \\
+\quad \text{任务:} & \text{评估应对资源 + 应对效能 (1-10)} \\
+\quad \text{输出:} & \{\text{coping\_resources}, \text{coping\_efficacy}, \text{resource\_narrative}\} \\[8pt]
+\textbf{Step 3: Reappraisal Agent（再评价智能体）—— Theory-guided Rollback} & \\
+\quad \text{输入:} & \text{Step 1 + Step 2 的输出} \\
+\quad \text{任务:} & \text{检验初级/次级评价的一致性} \\
+\quad \text{约束:} & \text{Lazarus 理论要求 } \text{Stress} = f(\text{Primary} \times \text{Secondary}) \\
+& \text{若 Primary 高但 Secondary 也高} \to \text{压力应低} \to \text{回滚修正} \\
+& \text{若 Primary 低但 Secondary 也低} \to \text{潜在忽视} \to \text{回滚修正} \\
+\quad \text{输出:} & \{\text{reappraisal\_flag}, \text{corrected\_primary}, \text{corrected\_secondary}\} \\[8pt]
+\textbf{Step 4: Cognitive Distortion Agent（认知扭曲检测智能体)} & \\
+\quad \text{输入:} & \text{修正后的评价 + 原始文本} \\
+\quad \text{任务:} & \text{基于 ABC 理论检测认知扭曲} \\
+\quad \text{类型:} & \text{灾难化 / 过度概括 / 非黑即白 / 情绪推理 / 个人化} \\
+\quad \text{输出:} & \{\text{distortion\_type}, \text{distortion\_severity}, \text{evidence}\} \\[8pt]
+\textbf{Step 5: Integration Agent（整合智能体)} & \\
+\quad \text{输入:} & \text{Step 1-4 的全部输出} \\
+\quad \text{任务:} & \text{计算 Cusp 参数代理值} \\
+\quad \text{输出:} & \{a_{\text{proxy}} (\text{威胁-应对差}), \; b_{\text{proxy}} (\text{应对×支持}), \; c_{\text{proxy}} (\text{支持×重评})\}
+\end{array}
+$$
 
-Step 2: Secondary Appraisal Agent（次级评价智能体）
-  输入: 个体文本 + Step 1 的威胁识别
-  任务: 评估应对资源 + 应对效能 (1-10)
-  输出: {coping_resources, coping_efficacy, resource_narrative}
-
-Step 3: Reappraisal Agent（再评价智能体）—— Theory-guided Rollback
-  输入: Step 1 + Step 2 的输出
-  任务: 检验初级/次级评价的一致性
-  约束: Lazarus 理论要求 Stress = f(Primary × Secondary)
-  若 Primary 高但 Secondary 也高 → 压力应低 → 回滚修正
-  若 Primary 低但 Secondary 也低 → 潜在忽视 → 回滚修正
-  输出: {reappraisal_flag, corrected_primary, corrected_secondary}
-
-Step 4: Cognitive Distortion Agent（认知扭曲检测智能体）
-  输入: 修正后的评价 + 原始文本
-  任务: 基于 ABC 理论检测认知扭曲
-  类型: 灾难化 / 过度概括 / 非黑即白 / 情绪推理 / 个人化
-  输出: {distortion_type, distortion_severity, evidence}
-
-Step 5: Integration Agent（整合智能体）
-  输入: Step 1-4 的全部输出
-  任务: 计算 Cusp 参数代理值
-  输出: {a_proxy (威胁-应对差), b_proxy (应对×支持), c_proxy (支持×重评)}
-```
-
-**关键创新**：Step 3 的 Theory-guided Rollback 机制确保 LLM 的推理**必须通过 Lazarus 理论的一致性检验**。如果 LLM 的输出违反了 `Stress = f(Primary × Secondary)` 的理论约束（例如高威胁+高应对却输出高压力），系统会自动回滚并要求重新评估。这种机制化的理论约束远超简单的 prompt 模板，确保了输出的心理学理论一致性。
+**关键创新**：Step 3 的 Theory-guided Rollback 机制确保 LLM 的推理**必须通过 Lazarus 理论的一致性检验**。如果 LLM 的输出违反了 $\text{Stress} = f(\text{Primary} \times \text{Secondary})$ 的理论约束（例如高威胁+高应对却输出高压力），系统会自动回滚并要求重新评估。这种机制化的理论约束远超简单的 prompt 模板，确保了输出的心理学理论一致性。
 
 ### 创新点 5：Training-free 范式的理论优势——对训练数据三大问题的免疫
 
@@ -481,9 +361,9 @@ CuspNet Layer 1 在 Sachs 数据上 SHD 最低（因理论约束减少等价类�
 
 | 模型 | 方程 | 类型 |
 |------|------|------|
-| 线性回归 | `x = β₀ + β₁a + β₂b` | 线性 |
-| 逻辑回归 | `P(risk) = sigmoid(β₀ + β₁a + β₂b)` | 广义线性 |
-| Cusp 模型 | `dx/dt = a + bx - cx³` | 非线性动力学 |
+| 线性回归 | $x = \beta_0 + \beta_1 a + \beta_2 b$ | 线性 |
+| 逻辑回归 | $P(\text{risk}) = \text{sigmoid}(\beta_0 + \beta_1 a + \beta_2 b)$ | 广义线性 |
+| Cusp 模型 | $\frac{dx}{dt} = a + bx - cx^3$ | 非线性动力学 |
 
 #### 评估方法
 
@@ -507,9 +387,9 @@ Cusp 模型在 AIC/BIC 上显著优于线性/逻辑模型，且能预测线性�
 
 #### 实验设计
 
-1. 在 T₁ 时间点计算每个个体的 ΔV
-2. 将个体分为三组：高韧性（ΔV > 75th percentile）、中韧性、低韧性（ΔV < 25th percentile）
-3. 在 T₂（后续时间点）追踪心理健康状态变化
+1. 在 $T_1$ 时间点计算每个个体的 $\Delta V$
+2. 将个体分为三组：高韧性（$\Delta V > 75^{\text{th}}$ percentile）、中韧性、低韧性（$\Delta V < 25^{\text{th}}$ percentile）
+3. 在 $T_2$（后续时间点）追踪心理健康状态变化
 4. 检验低韧性组是否更可能发生临界转变（风险突然从低跳到高）
 
 #### 统计方法
@@ -581,7 +461,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
   c_proxy = norm(MSPSS_proxy × LLM_extract("社会支持感知", text))
 ```
 
-其中 `LLM_extract` 是 Lazarus 约束的零样本抽取函数（见 Layer 3 Step 3.1），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
+其中 $\text{LLM\_extract}$ 是 Lazarus 约束的零样本抽取函数（见 Layer 3 Step 3.1），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
 
 > **验证方法**：在同时具备文本和量表的数据集（如自采数据）上，对比 LLM 代理参数与真实量表分数的相关性，确保代理有效性（预期 r > 0.4）。
 
