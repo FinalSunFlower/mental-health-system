@@ -163,12 +163,12 @@ $$
 
 > **四公式闭环**：网络结构 $(\mathbf{A})$ $\rightarrow$ 动力学(ODE) $\rightarrow$ 吸引子 $(\Delta V)$ $\rightarrow$ 认知评价 $(a)$ $\rightarrow$ 网络结构
 
-**闭环关键步骤的动力学解释**：$\Delta V \to a$ 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
+**闭环关键步骤的动力学解释**：$\Delta V \rightarrow a$ 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
 
 1. 系统陷入病理吸引子（ΔV 坍塌至接近零）意味着个体失去了从病理状态恢复的"势能"
 2. 这种状态坍塌会导致**认知扭曲的固化**——个体的次级评价（应对效能）持续降低，初级评价（威胁感知）持续升高
-3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t+1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \text{sign}(\Delta V \to 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
-4. 漂移后的 $a(t+1)$ 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
+3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t{+}1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \operatorname{sign}(\Delta V \rightarrow 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
+4. 漂移后的 $a(t{+}1)$ 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
 
 这一机制在临床上有明确对应：抑郁患者的"反刍思维"（rumination）正是状态依赖参数演行的表现——低韧性状态→认知扭曲加剧→压力评估升高→韧性进一步降低。
 
@@ -230,7 +230,7 @@ V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\
 \end{aligned}
 $$
 
-这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 $\Delta V \to 0$ 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
+这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 $\Delta V \rightarrow 0$ 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
 
 ### 创新点 4：Lazarus 理论约束的多步反思认知评价流（Theory-Guided Reflective Appraisal Chain）
 
@@ -243,23 +243,23 @@ $$
 &\textbf{Step 1: Primary Appraisal Agent（初级评价智能体)} \\
 &\quad \text{输入}: \text{个体文本} \\
 &\quad \text{任务}: \text{识别威胁刺激} + \text{评估威胁程度} (1\text{-}10) \\
-&\quad \text{输出}: \{\text{threat\_type},\; \text{threat\_intensity},\; \text{threat\_narrative}\} \\
+&\quad \text{输出}: \{\texttt{threatType},\; \texttt{threatIntensity},\; \texttt{threatNarrative}\} \\
 &\textbf{Step 2: Secondary Appraisal Agent（次级评价智能体)} \\
 &\quad \text{输入}: \text{个体文本} + \text{Step 1 的威胁识别} \\
 &\quad \text{任务}: \text{评估应对资源} + \text{应对效能} (1\text{-}10) \\
-&\quad \text{输出}: \{\text{coping\_resources},\; \text{coping\_efficacy},\; \text{resource\_narrative}\} \\
+&\quad \text{输出}: \{\texttt{copingResources},\; \texttt{copingEfficacy},\; \texttt{resourceNarrative}\} \\
 &\textbf{Step 3: Reappraisal Agent（再评价智能体）— Theory-guided Rollback} \\
 &\quad \text{输入}: \text{Step 1} + \text{Step 2 的输出} \\
 &\quad \text{任务}: \text{检验初级/次级评价的一致性} \\
 &\quad \text{约束}: \text{Lazarus 理论要求 } \text{Stress} = f(\text{Primary} \times \text{Secondary}) \\
 &\quad \text{若 Primary 高但 Secondary 也高} \to \text{压力应低} \to \text{回滚修正} \\
 &\quad \text{若 Primary 低但 Secondary 也低} \to \text{潜在忽视} \to \text{回滚修正} \\
-&\quad \text{输出}: \{\text{reappraisal\_flag},\; \text{corrected\_primary},\; \text{corrected\_secondary}\} \\
+&\quad \text{输出}: \{\texttt{reappraisalFlag},\; \texttt{correctedPrimary},\; \texttt{correctedSecondary}\} \\
 &\textbf{Step 4: Cognitive Distortion Agent（认知扭曲检测智能体)} \\
 &\quad \text{输入}: \text{修正后的评价} + \text{原始文本} \\
 &\quad \text{任务}: \text{基于 ABC 理论检测认知扭曲} \\
 &\quad \text{类型}: \text{灾难化} / \text{过度概括} / \text{非黑即白} / \text{情绪推理} / \text{个人化} \\
-&\quad \text{输出}: \{\text{distortion\_type},\; \text{distortion\_severity},\; \text{evidence}\} \\
+&\quad \text{输出}: \{\texttt{distortionType},\; \texttt{distortionSeverity},\; \texttt{evidence}\} \\
 &\textbf{Step 5: Integration Agent（整合智能体)} \\
 &\quad \text{输入}: \text{Step 1-4 的全部输出} \\
 &\quad \text{任务}: \text{计算 Cusp 参数代理值} \\
@@ -461,7 +461,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
   c_proxy = norm(MSPSS_proxy × LLM_extract("社会支持感知", text))
 ```
 
-其中 $\text{LLM\_extract}$ 是 Lazarus 约束的零样本抽取函数（见 [Layer 3](#创新点-4lazarus-理论约束的多步反思认知评价流theory-guided-reflective-appraisal-chain) Step 3-5），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
+其中 $\texttt{LLMExtract}$ 是 Lazarus 约束的零样本抽取函数（见 [Layer 3](#创新点-4lazarus-理论约束的多步反思认知评价流theory-guided-reflective-appraisal-chain) Step 3-5），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
 
 > **验证方法**：在同时具备文本和量表的数据集（如自采数据）上，对比 LLM 代理参数与真实量表分数的相关性，确保代理有效性（预期 r > 0.4）。
 
