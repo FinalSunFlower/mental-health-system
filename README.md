@@ -102,13 +102,13 @@ $$
 
 $$
 \begin{aligned}
-a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
-b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性储备更脆弱} \\
-c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状具有更强的跨簇调节}
+a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_{i}) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_{i}) &&\leftarrow \text{高中心性症状韧性储备更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_{i})      &&\leftarrow \text{桥接症状具有更强的跨簇调节}
 \end{aligned}
 $$
 
-其中 $\text{centrality}_i$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\text{bridge}_i$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
+其中 $\text{centrality}_{i}$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\text{bridge}_{i}$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
 
 **心理学依据**：高中心性症状（如"失眠"）既是压力的首要入口（$a_i$ 更大），也是韧性最容易崩溃的薄弱环节（$b_i$ 更小），这符合 Borsboom (2017) 的核心论断——"中心症状是维持网络病理结构的关键枢纽"。
 
@@ -132,10 +132,10 @@ $$
 **来源**：Luo, M. (2026). A circuit-based framework for depression. *Neuron*.
 
 $$
-\frac{dV_{\text{basin}}}{dt} = \sum_k \alpha_k \cdot \text{feedback}_k(x)
+\frac{dV_{\text{basin}}}{dt} = \sum_k \alpha_k \cdot \text{feedback}_{k}(x)
 $$
 
-其中 $V_{\text{basin}}$ 是病理吸引盆的深度，$\text{feedback}_k$ 是第 $k$ 个正反馈回路的强度。
+其中 $V_{\text{basin}}$ 是病理吸引盆的深度，$\text{feedback}_{k}$ 是第 $k$ 个正反馈回路的强度。
 
 **在 CuspNet 中的操作化**：从 EBICglasso 网络中识别正反馈回路（有向环），计算每个环的强度（边权重的几何平均），评估这些环如何加深病理吸引盆。
 
@@ -204,9 +204,9 @@ $$
 
 $$
 \begin{aligned}
-a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
-b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性更脆弱} \\
-c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状跨簇调节更强}
+a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_{i}) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_{i}) &&\leftarrow \text{高中心性症状韧性更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_{i})      &&\leftarrow \text{桥接症状跨簇调节更强}
 \end{aligned}
 $$
 
@@ -241,29 +241,29 @@ $$
 $$
 \begin{aligned}
 &\textbf{Step 1: Primary Appraisal Agent（初级评价智能体)} \\
-&\quad \text{输入: 个体文本} \\
-&\quad \text{任务: 识别威胁刺激 + 评估威胁程度 (1-10)} \\
-&\quad \text{输出: } \{\text{threat\_type},\; \text{threat\_intensity},\; \text{threat\_narrative}\} \\
+&\quad \text{输入}: \text{个体文本} \\
+&\quad \text{任务}: \text{识别威胁刺激} + \text{评估威胁程度} (1\text{-}10) \\
+&\quad \text{输出}: \{\text{threat\_type},\; \text{threat\_intensity},\; \text{threat\_narrative}\} \\
 &\textbf{Step 2: Secondary Appraisal Agent（次级评价智能体)} \\
-&\quad \text{输入: 个体文本 + Step 1 的威胁识别} \\
-&\quad \text{任务: 评估应对资源 + 应对效能 (1-10)} \\
-&\quad \text{输出: } \{\text{coping\_resources},\; \text{coping\_efficacy},\; \text{resource\_narrative}\} \\
+&\quad \text{输入}: \text{个体文本} + \text{Step 1 的威胁识别} \\
+&\quad \text{任务}: \text{评估应对资源} + \text{应对效能} (1\text{-}10) \\
+&\quad \text{输出}: \{\text{coping\_resources},\; \text{coping\_efficacy},\; \text{resource\_narrative}\} \\
 &\textbf{Step 3: Reappraisal Agent（再评价智能体）— Theory-guided Rollback} \\
-&\quad \text{输入: Step 1 + Step 2 的输出} \\
-&\quad \text{任务: 检验初级/次级评价的一致性} \\
-&\quad \text{约束: Lazarus 理论要求 Stress} = f(\text{Primary} \times \text{Secondary}) \\
+&\quad \text{输入}: \text{Step 1} + \text{Step 2 的输出} \\
+&\quad \text{任务}: \text{检验初级/次级评价的一致性} \\
+&\quad \text{约束}: \text{Lazarus 理论要求 } \text{Stress} = f(\text{Primary} \times \text{Secondary}) \\
 &\quad \text{若 Primary 高但 Secondary 也高} \to \text{压力应低} \to \text{回滚修正} \\
 &\quad \text{若 Primary 低但 Secondary 也低} \to \text{潜在忽视} \to \text{回滚修正} \\
-&\quad \text{输出: } \{\text{reappraisal\_flag},\; \text{corrected\_primary},\; \text{corrected\_secondary}\} \\
+&\quad \text{输出}: \{\text{reappraisal\_flag},\; \text{corrected\_primary},\; \text{corrected\_secondary}\} \\
 &\textbf{Step 4: Cognitive Distortion Agent（认知扭曲检测智能体)} \\
-&\quad \text{输入: 修正后的评价 + 原始文本} \\
-&\quad \text{任务: 基于 ABC 理论检测认知扭曲} \\
-&\quad \text{类型: 灾难化 / 过度概括 / 非黑即白 / 情绪推理 / 个人化} \\
-&\quad \text{输出: } \{\text{distortion\_type},\; \text{distortion\_severity},\; \text{evidence}\} \\
+&\quad \text{输入}: \text{修正后的评价} + \text{原始文本} \\
+&\quad \text{任务}: \text{基于 ABC 理论检测认知扭曲} \\
+&\quad \text{类型}: \text{灾难化} / \text{过度概括} / \text{非黑即白} / \text{情绪推理} / \text{个人化} \\
+&\quad \text{输出}: \{\text{distortion\_type},\; \text{distortion\_severity},\; \text{evidence}\} \\
 &\textbf{Step 5: Integration Agent（整合智能体)} \\
-&\quad \text{输入: Step 1-4 的全部输出} \\
-&\quad \text{任务: 计算 Cusp 参数代理值} \\
-&\quad \text{输出: } \{a_{\text{proxy}}\;(\text{威胁-应对差}),\; b_{\text{proxy}}\;(\text{应对×支持}),\; c_{\text{proxy}}\;(\text{支持×重评})\}
+&\quad \text{输入}: \text{Step 1-4 的全部输出} \\
+&\quad \text{任务}: \text{计算 Cusp 参数代理值} \\
+&\quad \text{输出}: \{a_{\text{proxy}}(\text{威胁-应对差}),\; b_{\text{proxy}}(\text{应对×支持}),\; c_{\text{proxy}}(\text{支持×重评})\}
 \end{aligned}
 $$
 
@@ -461,7 +461,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
   c_proxy = norm(MSPSS_proxy × LLM_extract("社会支持感知", text))
 ```
 
-其中 $\text{LLM\_extract}$ 是 Lazarus 约束的零样本抽取函数（见 Layer 3 Step 3.1），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
+其中 $\text{LLM\_extract}$ 是 Lazarus 约束的零样本抽取函数（见 [Layer 3](#创新点-4lazarus-理论约束的多步反思认知评价流theory-guided-reflective-appraisal-chain) Step 3-5），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
 
 > **验证方法**：在同时具备文本和量表的数据集（如自采数据）上，对比 LLM 代理参数与真实量表分数的相关性，确保代理有效性（预期 r > 0.4）。
 
