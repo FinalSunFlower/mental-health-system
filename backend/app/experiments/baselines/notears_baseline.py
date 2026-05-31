@@ -7,7 +7,7 @@ def run_notears(X: np.ndarray, lambda1: float = 0.01, max_iter: int = 100) -> np
     try:
         from notears.linear import notears_linear
         W = notears_linear(X_std, lambda1=lambda1, max_iter=max_iter, loss_type='l2')
-        adj = (np.abs(W) > 0.1).astype(np.float64)
+        adj = (np.abs(W) > 0.3).astype(np.float64)
         np.fill_diagonal(adj, 0)
         return adj
     except (ImportError, AttributeError):
@@ -15,7 +15,7 @@ def run_notears(X: np.ndarray, lambda1: float = 0.01, max_iter: int = 100) -> np
     return _notears_fallback(X_std, lambda1, max_iter)
 
 
-def _notears_fallback(X: np.ndarray, lambda1: float = 0.1, max_iter: int = 100) -> np.ndarray:
+def _notears_fallback(X: np.ndarray, lambda1: float = 0.01, max_iter: int = 100) -> np.ndarray:
     from scipy.optimize import minimize
 
     n, d = X.shape

@@ -12,7 +12,7 @@ print("=" * 60)
 from app.experiments.exp2_cusp_fitting import run_exp2
 
 try:
-    results = run_exp2(dataset="kossakowski", window_size=7)
+    results = run_exp2(dataset="studentlife", window_size=7)
 
     print("\n--- Dataset Info ---")
     di = results["dataset_info"]
@@ -41,10 +41,39 @@ try:
     for name, val in r2.items():
         print(f"  {name}: {val:.4f}")
 
-    print("\n--- Cusp Prediction Accuracy ---")
+    print("\n--- Prediction Accuracy ---")
     pa = results["prediction_accuracy"]
-    for name, val in pa.items():
-        print(f"  {name}: {val:.4f}")
+    tol = pa.get("tolerance", 0.15)
+    print(f"  Tolerance: {tol}")
+    for name in ["linear", "logistic", "cusp"]:
+        if name in pa:
+            print(f"  {name}: {pa[name]:.4f}")
+
+    if "mae" in results:
+        print("\n--- Mean Absolute Error ---")
+        mae = results["mae"]
+        for name in ["linear", "logistic", "cusp"]:
+            if name in mae:
+                print(f"  {name}: {mae[name]:.4f}")
+
+    print("\n--- Adjusted R-squared ---")
+    adj_r2 = results.get("adjusted_r2", {})
+    for name in ["linear", "logistic", "cusp"]:
+        if name in adj_r2:
+            print(f"  {name}: {adj_r2[name]:.4f}")
+
+    if "cross_validated_mae" in results:
+        print("\n--- Cross-Validated MAE (5-fold) ---")
+        cv = results["cross_validated_mae"]
+        for name in ["linear", "logistic", "cusp_equilibrium", "cusp_dynamics"]:
+            if name in cv:
+                print(f"  {name}: {cv[name]['mean']:.4f} +/- {cv[name]['std']:.4f}")
+        if "classification_accuracy" in cv:
+            print("\n--- Cross-Validated Classification Accuracy (5-fold) ---")
+            cls_acc = cv["classification_accuracy"]
+            for name in ["cusp", "linear", "logistic"]:
+                if name in cls_acc:
+                    print(f"  {name}: {cls_acc[name]['mean']:.4f} +/- {cls_acc[name]['std']:.4f}")
 
     cusp_aic = fits["cusp"]["aic"]
     linear_aic = fits["linear"]["aic"]

@@ -55,3 +55,12 @@ desktop.ini
 
 # Logs
 *.log
+
+# Raw datasets (too large / license-restricted for GitHub)
+# See README.md Section 5.8 for download instructions
+backend/app/data/raw/
+
+# Experiment output / results
+backend/results/
+backend/output/
+backend/experiments/results/

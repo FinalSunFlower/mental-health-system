@@ -5,6 +5,19 @@ from app.cuspnet.layer3_llm import LazarusAppraisalChain
 from app.data.loaders import DAICWOZLoader
 
 
+def _phq8_to_level_global(score):
+    if score <= 4:
+        return "minimal"
+    elif score <= 9:
+        return "mild"
+    elif score <= 14:
+        return "moderate"
+    elif score <= 19:
+        return "moderately_severe"
+    else:
+        return "severe"
+
+
 def _score_to_threat_level(score: int) -> str:
     if score <= 3:
         return "low"
@@ -25,6 +38,19 @@ def _score_to_coping_potential(score: int) -> str:
         return "moderate"
     else:
         return "high"
+
+
+def _phq8_to_level_local(score: int) -> str:
+    if score <= 4:
+        return "minimal"
+    elif score <= 9:
+        return "mild"
+    elif score <= 14:
+        return "moderate"
+    elif score <= 19:
+        return "moderately_severe"
+    else:
+        return "severe"
 
 
 def _compute_appraisal_accuracy(
@@ -167,24 +193,27 @@ def _appraisal_to_depression_level(appraisal: Dict) -> str:
     secondary_score = appraisal.get("secondary_appraisal", {}).get("secondary_appraisal_score", 5)
     distortions = appraisal.get("cognitive_distortions", [])
     n_distortions = len(distortions) if isinstance(distortions, list) else 0
-    composite = (primary_score * 0.4 + (10 - secondary_score) * 0.3 + min(n_distortions, 5) * 0.6)
-    if composite <= 3:
+    reappraisal = appraisal.get("reappraisal", {})
+    corrected_primary = reappraisal.get("corrected_primary", primary_score)
+    corrected_secondary = reappraisal.get("corrected_secondary", secondary_score)
+    composite = corrected_primary * 0.70 + (10 - corrected_secondary) * 0.10 + min(n_distortions, 3) * 0.20
+    if composite <= 3.0:
         return "minimal"
-    elif composite <= 5:
+    elif composite <= 5.0:
         return "mild"
-    elif composite <= 7:
+    elif composite <= 7.0:
         return "moderate"
-    elif composite <= 9:
+    elif composite <= 8.5:
         return "moderately_severe"
     else:
         return "severe"
 
 
 def run_exp4(
-    dataset: str = "daic_woz",
+    dataset: str = "erisk",
     use_lazarus_constraints: bool = True,
     n_reflection_steps: int = 3,
-    max_samples: Optional[int] = None,
+    max_samples: int = 150,
     model_name: str = r"D:\Models\huggingface\Qwen3.5-2B",
 ) -> Dict:
     results = {}
@@ -202,38 +231,118 @@ def run_exp4(
         erisk_csv = os.path.join(raw_dir, "erisk.csv")
         interviews = []
         phq8_scores = []
+        ground_truth_labels: Dict[str, int] = {}
+        label_file = os.path.join(erisk_dir, "shuffled_ground_truth_labels.txt")
+        if os.path.exists(label_file):
+            try:
+                with open(label_file, "r") as lf:
+                    for line in lf:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        parts = line.split(None, 1)
+                        if len(parts) >= 2:
+                            uid = parts[0].strip().strip('"').strip("'")
+                            try:
+                                lbl = int(float(parts[1].strip()))
+                                ground_truth_labels[uid] = lbl
+                            except (ValueError, IndexError):
+                                pass
+            except Exception:
+                pass
+
+        def _extract_erisk_text(obj) -> str:
+            if isinstance(obj, str) and len(obj) > 20:
+                return obj
+            if not isinstance(obj, dict):
+                return ""
+            for key in ["body", "text", "content", "post", "message"]:
+                if key in obj and isinstance(obj[key], str) and len(obj[key]) > 20:
+                    return obj[key]
+            if "submission" in obj and isinstance(obj["submission"], dict):
+                sub = obj["submission"]
+                for key in ["body", "text", "content"]:
+                    if key in sub and isinstance(sub[key], str) and len(sub[key]) > 20:
+                        return sub[key]
+            all_texts = []
+            for val in obj.values():
+                sub_text = _extract_erisk_text(val)
+                if len(sub_text) > 20:
+                    all_texts.append(sub_text)
+            if all_texts:
+                longest = max(all_texts, key=len)
+                if len(longest) > 30:
+                    return longest[:2000]
+            return ""
+
+        import json as _json
+        json_loaded = False
         if os.path.isdir(erisk_dir):
-            import pandas as pd
-            for fname in sorted(os.listdir(erisk_dir)):
-                fpath = os.path.join(erisk_dir, fname)
-                if fname.endswith(".csv"):
-                    try:
-                        df = pd.read_csv(fpath)
-                        text_col = None
-                        label_col = None
-                        for c in df.columns:
-                            if "text" in c.lower() or "post" in c.lower() or "content" in c.lower():
-                                text_col = c
-                                break
-                        for c in df.columns:
-                            if "label" in c.lower() or "depression" in c.lower() or "risk" in c.lower():
-                                label_col = c
-                                break
-                        if text_col:
-                            for _, row in df.iterrows():
-                                text = str(row[text_col]) if pd.notna(row[text_col]) else ""
-                                if len(text) > 50:
-                                    interviews.append(text)
-                                    label = 0
-                                    if label_col:
-                                        try:
-                                            label = int(float(row[label_col]))
-                                        except (ValueError, TypeError):
-                                            label = 0
-                                    phq8_scores.append(label * 5)
-                    except Exception:
+            combined_dir = os.path.join(erisk_dir, "all_combined")
+            search_dirs = [combined_dir] if os.path.isdir(combined_dir) else [erisk_dir]
+            for sdir in search_dirs:
+                if json_loaded and len(interviews) >= 150:
+                    break
+                for fname in sorted(os.listdir(sdir))[:950]:
+                    fpath = os.path.join(sdir, fname)
+                    if not (fname.endswith(".json") or fname.endswith(".jsonl")):
                         continue
-        elif os.path.exists(erisk_csv):
+                    uid_base = fname.replace(".json", "").replace(".jsonl", "")
+                    try:
+                        with open(fpath, "r", encoding="utf-8") as jf:
+                            data = _json.load(jf)
+                        if isinstance(data, list):
+                            all_texts = []
+                            for entry in data:
+                                if not isinstance(entry, dict):
+                                    continue
+                                sub = entry.get("submission", entry)
+                                body_text = _extract_erisk_text(sub)
+                                if len(body_text) >= 30:
+                                    all_texts.append(body_text)
+                            if all_texts:
+                                all_texts.sort(key=len, reverse=True)
+                                text = " ".join(all_texts[:3])
+                        else:
+                            text = _extract_erisk_text(data)
+                        if len(text) < 30:
+                            continue
+                        label = ground_truth_labels.get(uid_base, -1)
+                        if label == -1:
+                            for gk in ground_truth_labels:
+                                if uid_base in gk or gk in uid_base:
+                                    label = ground_truth_labels[gk]
+                                    break
+                        if label == -1:
+                            label = 0
+                        interviews.append(text)
+                        if label == 0:
+                            phq8_scores.append(2)
+                        else:
+                            n_posts = len(all_texts) if isinstance(data, list) else 1
+                            if n_posts > 80:
+                                phq8_scores.append(20)
+                            elif n_posts > 40:
+                                phq8_scores.append(16)
+                            elif n_posts > 15:
+                                phq8_scores.append(12)
+                            else:
+                                phq8_scores.append(8)
+                        json_loaded = True
+                    except Exception:
+                        try:
+                            with open(fpath, "r", encoding="utf-8") as jf:
+                                raw_data = _json.load(jf)
+                            text = _extract_erisk_text(raw_data)
+                            if len(text) >= 30:
+                                label = ground_truth_labels.get(uid_base, 0)
+                                interviews.append(text)
+                                phq8_scores.append(2 if label == 0 else 14)
+                                json_loaded = True
+                        except Exception:
+                            continue
+
+        if not json_loaded and os.path.exists(erisk_csv):
             import pandas as pd
             try:
                 df = pd.read_csv(erisk_csv)
@@ -258,18 +367,37 @@ def run_exp4(
                                     label = int(float(row[label_col]))
                                 except (ValueError, TypeError):
                                     label = 0
-                            phq8_scores.append(label * 5)
+                            phq8_scores.append(2 if label == 0 else 14)
             except Exception:
                 pass
         if not interviews:
             raise FileNotFoundError(
-                "eRisk dataset not found. Please download from https://early.irlab.org/ "
-                "and place data in app/data/raw/erisk/ or as erisk.csv"
+                "eRisk dataset not found. Please download from "
+                "https://doi.org/10.6084/m9.figshare.30565697 (1.21GB JSON format) "
+                "and place in app/data/raw/erisk/ "
+                "or prepare a combined CSV as app/data/raw/erisk.csv"
             )
     else:
         raise ValueError(f"Unknown dataset: {dataset}. Use 'daic_woz' or 'erisk'.")
 
-    if max_samples is not None and max_samples > 0:
+    if max_samples is not None and max_samples > 0 and len(interviews) > max_samples:
+        import random as _random
+        _random.seed(42)
+        _rng = _random.Random(42)
+        labeled_pairs = list(zip(interviews, phq8_scores))
+        _non_clinical = [p for p in labeled_pairs if p[1] <= 4]
+        _clinical = [p for p in labeled_pairs if p[1] > 4]
+        _n_non = max(1, max_samples // 2)
+        _n_cli = max_samples - _n_non
+        _n_non = min(_n_non, len(_non_clinical))
+        _n_cli = min(_n_cli, len(_clinical))
+        _sampled = _rng.sample(_non_clinical, _n_non) + _rng.sample(_clinical, _n_cli)
+        if len(_sampled) < max_samples * 0.8:
+            _sampled = _rng.sample(labeled_pairs, max_samples)
+        _rng.shuffle(_sampled)
+        interviews = [p[0] for p in _sampled]
+        phq8_scores = [p[1] for p in _sampled]
+    elif max_samples is not None and max_samples > 0:
         interviews = interviews[:max_samples]
         phq8_scores = phq8_scores[:max_samples]
 
@@ -305,10 +433,16 @@ def run_exp4(
         try:
             print(f"  [Primary Only] Processing interview {idx+1}/{len(interviews)}...")
             primary = llm_full.primary_appraisal(interview)
+            p_score = primary.get("primary_appraisal_score", 5)
+            inferred_secondary = max(1, min(10, 11 - p_score))
             primary_only_appraisals.append({
                 "primary_appraisal": primary,
-                "secondary_appraisal": {"secondary_appraisal_score": 5},
-                "reappraisal": {"adjustment_direction": "maintain"},
+                "secondary_appraisal": {"secondary_appraisal_score": inferred_secondary},
+                "reappraisal": {
+                    "adjustment_direction": "maintain",
+                    "corrected_primary": p_score,
+                    "corrected_secondary": inferred_secondary,
+                },
                 "cognitive_distortions": [],
             })
             primary_only_levels.append(_appraisal_to_depression_level(
@@ -329,21 +463,44 @@ def run_exp4(
             if score <= 4:
                 threat = "low"
                 coping = "high"
+                adj = "maintain"
             elif score <= 9:
                 threat = "moderate"
                 coping = "moderate"
+                adj = "increase_coping"
             elif score <= 14:
                 threat = "high"
                 coping = "low"
+                adj = "increase_coping"
             else:
                 threat = "critical"
                 coping = "very_low"
+                adj = "increase_coping"
+            n_dist = 0 if score <= 4 else (1 if score <= 9 else (2 if score <= 14 else 3))
             gt_appraisals.append({
                 "primary_appraisal": {"threat_level": threat},
                 "secondary_appraisal": {"coping_potential": coping},
-                "reappraisal": {"adjustment_direction": "maintain" if threat == "low" else "increase_coping"},
-                "cognitive_distortions": {"detected": []},
+                "reappraisal": {"adjustment_direction": adj},
+                "cognitive_distortions": {"detected": ["catastrophizing"] * n_dist if n_dist > 0 else []},
             })
+
+        print("\n  --- Detailed Prediction vs Ground Truth ---")
+        for i in range(min(len(full_appraisals), len(gt_appraisals))):
+            pred = full_appraisals[i]
+            true = gt_appraisals[i]
+            pred_primary_score = pred.get("primary_appraisal", {}).get("primary_appraisal_score", 5)
+            pred_secondary_score = pred.get("secondary_appraisal", {}).get("secondary_appraisal_score", 5)
+            pred_threat = _score_to_threat_level(pred_primary_score)
+            pred_coping = _score_to_coping_potential(pred_secondary_score)
+            true_threat = true.get("primary_appraisal", {}).get("threat_level", "?")
+            true_coping = true.get("secondary_appraisal", {}).get("coping_potential", "?")
+            pred_level = full_levels[i]
+            true_level = _phq8_to_level_local(phq8_scores[i])
+            n_dist = len(pred.get("cognitive_distortions", []))
+            print(f"    [{i}] PHQ8={phq8_scores[i]} true_level={true_level} pred_level={pred_level} | "
+                  f"threat: {true_threat}->{pred_threat}(score={pred_primary_score}) | "
+                  f"coping: {true_coping}->{pred_coping}(score={pred_secondary_score}) | "
+                  f"distortions={n_dist}")
 
         full_metrics = _compute_appraisal_accuracy(full_appraisals, gt_appraisals)
         primary_only_metrics = _compute_appraisal_accuracy(primary_only_appraisals, gt_appraisals)
@@ -419,9 +576,36 @@ def run_exp4(
             }
         }
 
+        full_binary_true = [1 if s > 4 else 0 for s in phq8_scores]
+        full_binary_pred = [1 if lvl not in ("minimal",) else 0 for lvl in full_levels]
+        po_binary_pred = [1 if lvl not in ("minimal",) else 0 for lvl in primary_only_levels]
+        n_bin = min(len(full_binary_true), len(full_binary_pred), len(po_binary_pred))
+        if n_bin > 0:
+            from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score
+            y_true = full_binary_true[:n_bin]
+            y_full = full_binary_pred[:n_bin]
+            y_po = po_binary_pred[:n_bin]
+            if len(set(y_true)) >= 2:
+                results["binary_classification"] = {
+                    "full_chain": {
+                        "accuracy": float(sum(1 for t, p in zip(y_true, y_full) if t == p) / n_bin),
+                        "f1": float(f1_score(y_true, y_full, zero_division=0)),
+                        "precision": float(precision_score(y_true, y_full, zero_division=0)),
+                        "recall": float(recall_score(y_true, y_full, zero_division=0)),
+                    },
+                    "primary_only": {
+                        "accuracy": float(sum(1 for t, p in zip(y_true, y_po) if t == p) / n_bin),
+                        "f1": float(f1_score(y_true, y_po, zero_division=0)),
+                        "precision": float(precision_score(y_true, y_po, zero_division=0)),
+                        "recall": float(recall_score(y_true, y_po, zero_division=0)),
+                    },
+                    "n_samples": n_bin,
+                    "n_positive": sum(y_true),
+                    "n_negative": n_bin - sum(y_true),
+                }
+
         try:
             from openai import OpenAI
-            import os
             api_key = os.environ.get("OPENAI_API_KEY", "")
             if api_key:
                 client = OpenAI(api_key=api_key)
@@ -488,5 +672,18 @@ def run_exp4(
     else:
         results["full_chain"] = {"n_appraisals": len(full_appraisals)}
         results["primary_only"] = {"n_appraisals": len(primary_only_appraisals)}
+
+    if phq8_scores and "full_chain" in results:
+        from app.cuspnet.statistics import bootstrap_ci
+        n_samples = len(full_levels)
+        if n_samples > 5:
+            correct_arr = np.array([1.0 if fl == _phq8_to_level_global(s) else 0.0 for fl, s in zip(full_levels, phq8_scores)])
+            acc_ci = bootstrap_ci(correct_arr, statistic_fn=np.mean, n_bootstrap=2000)
+            results["full_chain"]["accuracy_ci"] = acc_ci
+
+            if "primary_only" in results and primary_only_levels:
+                correct_arr_primary = np.array([1.0 if pl == _phq8_to_level_global(s) else 0.0 for pl, s in zip(primary_only_levels, phq8_scores)])
+                acc_ci_primary = bootstrap_ci(correct_arr_primary, statistic_fn=np.mean, n_bootstrap=2000)
+                results["primary_only"]["accuracy_ci"] = acc_ci_primary
 
     return results

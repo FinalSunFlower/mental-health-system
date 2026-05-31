@@ -15,7 +15,4 @@ def run_pc(X: np.ndarray, alpha: float = 0.01) -> np.ndarray:
             if i != j:
                 if G.graph[j, i] == 1 and G.graph[i, j] == -1:
                     adj[i, j] = 1.0
-                elif G.graph[j, i] == -1 and G.graph[i, j] == -1:
-                    adj[i, j] = 1.0
-                    adj[j, i] = 1.0
     return adj

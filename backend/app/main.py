@@ -18,9 +18,7 @@ from app.core.schemas import (
 )
 from app.cuspnet import CuspNetEngine
 from app.cuspnet.utils import (
-    compute_resilience_reserve,
     compute_potential,
-    compute_critical_distance,
     find_fixed_points,
     classify_fixed_points,
 )
@@ -70,86 +68,35 @@ def _extract_student_scores(student: Student):
     return phq9, gad7, pss10, cdrisc, mspss
 
 
-def _build_single_sample_result(variable_names, a, b, c, resilience, cd, warning, risk_score, risk_level, l3_result=None):
-    from app.cuspnet.layer2_dynamics import CuspDynamicsLayer
-    x_range = np.linspace(-2, 2, 200)
-    V = compute_potential(x_range, a, b, c)
-    roots = find_fixed_points(a, b, c)
-    classified = classify_fixed_points(roots, b, c)
-    stable = [p for p in classified if p["stability"] == "stable"]
-    unstable = [p for p in classified if p["stability"] == "unstable"]
-
-    attractor_states = {
-        "fixed_points": classified,
-        "is_bistable": len(stable) >= 2,
-        "num_stable": len(stable),
-        "num_unstable": len(unstable),
-    }
-
-    potential_data = {
-        "a": a, "b": b, "c": c,
-        "x_range": x_range.tolist(),
-        "V": V.tolist(),
-    }
-    if attractor_states["is_bistable"]:
-        if stable:
-            potential_data["stable_fixed_points"] = [
-                {"x": fp["value"], "V": float(compute_potential(np.array([fp["value"]]), a, b, c)[0])}
-                for fp in stable
-            ]
-        if unstable:
-            potential_data["unstable_fixed_points"] = [
-                {"x": fp["value"], "V": float(compute_potential(np.array([fp["value"]]), a, b, c)[0])}
-                for fp in unstable
-            ]
-
-    return {
-        "risk_score": risk_score,
-        "risk_level": risk_level,
-        "causal_network": {
-            "precision_matrix": np.eye(len(variable_names)).tolist(),
-            "partial_correlation": np.zeros((len(variable_names), len(variable_names))).tolist(),
-            "causal_adjacency": np.zeros((len(variable_names), len(variable_names))).tolist(),
-            "topological_order": list(range(len(variable_names))),
-            "centrality_ranking": [0.0] * len(variable_names),
-            "bridge_centrality": [0.0] * len(variable_names),
-            "bridge_symptoms": [],
-            "positive_feedback_loops": [],
-            "variable_names": variable_names,
-        },
-        "dynamics": {
-            "global_a": a,
-            "global_b": b,
-            "global_c": c,
-            "local_params": [{"name": variable_names[i] if i < len(variable_names) else f"V{i}", "a": a, "b": b, "c": c} for i in range(len(variable_names))],
-            "attractor_states": attractor_states,
-            "resilience_reserve": resilience,
-            "critical_distance": cd,
-            "tipping_point_warning": warning,
-            "potential_function": potential_data,
-            "drift_prediction": None,
-            "simulation": None,
-        },
-        "llm_appraisal": l3_result,
-        "model_version": "CuspNet-1.0",
-    }
+def _to_json_serializable(obj):
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: _to_json_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_json_serializable(v) for v in obj]
+    return obj
 
 
 def _save_record(db: Session, student_id: int, result: dict):
     record = CuspNetRecord(
         student_id=student_id,
-        risk_score=result["risk_score"],
+        risk_score=float(result["risk_score"]),
         risk_level=result["risk_level"],
-        global_a=result["dynamics"]["global_a"],
-        global_b=result["dynamics"]["global_b"],
-        global_c=result["dynamics"]["global_c"],
-        resilience_reserve=result["dynamics"]["resilience_reserve"],
-        critical_distance=result["dynamics"]["critical_distance"],
-        tipping_point_warning=result["dynamics"]["tipping_point_warning"],
-        causal_adjacency=result["causal_network"]["causal_adjacency"],
-        centrality_ranking=result["causal_network"]["centrality_ranking"],
-        positive_feedback_loops=result["causal_network"]["positive_feedback_loops"],
-        attractor_states=result["dynamics"]["attractor_states"],
+        global_a=float(result["dynamics"]["global_a"]),
+        global_b=float(result["dynamics"]["global_b"]),
+        global_c=float(result["dynamics"]["global_c"]),
+        resilience_reserve=float(result["dynamics"]["resilience_reserve"]) if np.isfinite(result["dynamics"]["resilience_reserve"]) else None,
+        critical_distance=float(result["dynamics"]["critical_distance"]),
+        tipping_point_warning=bool(result["dynamics"]["tipping_point_warning"]),
+        causal_adjacency=_to_json_serializable(result["causal_network"]["causal_adjacency"]),
+        centrality_ranking=_to_json_serializable(result["causal_network"]["centrality_ranking"]),
+        positive_feedback_loops=_to_json_serializable(result["causal_network"]["positive_feedback_loops"]),
+        attractor_states=_to_json_serializable(result["dynamics"]["attractor_states"]),
         llm_primary=result.get("llm_appraisal", {}).get("primary_appraisal") if result.get("llm_appraisal") else None,
         llm_secondary=result.get("llm_appraisal", {}).get("secondary_appraisal") if result.get("llm_appraisal") else None,
         llm_distortions=result.get("llm_appraisal", {}).get("cognitive_distortions") if result.get("llm_appraisal") else None,
@@ -168,31 +115,31 @@ def _build_response(result: dict):
     llm = result.get("llm_appraisal")
 
     dynamics_result = DynamicsResult(
-        global_a=dy["global_a"],
-        global_b=dy["global_b"],
-        global_c=dy["global_c"],
+        global_a=float(dy["global_a"]),
+        global_b=float(dy["global_b"]),
+        global_c=float(dy["global_c"]),
         local_params=dy["local_params"],
         attractor_states=dy["attractor_states"],
-        resilience_reserve=dy["resilience_reserve"],
-        critical_distance=dy["critical_distance"],
-        tipping_point_warning=dy["tipping_point_warning"],
+        resilience_reserve=float(dy["resilience_reserve"]) if np.isfinite(dy["resilience_reserve"]) else 999.0,
+        critical_distance=float(dy["critical_distance"]),
+        tipping_point_warning=bool(dy["tipping_point_warning"]),
         potential_function=dy["potential_function"],
         drift_prediction=dy.get("drift_prediction"),
         simulation=dy.get("simulation"),
     )
 
     return CuspNetAssessmentResponse(
-        risk_score=result["risk_score"],
+        risk_score=float(result["risk_score"]),
         risk_level=RiskLevel(result["risk_level"]),
         causal_network=CausalNetworkResult(
-            precision_matrix=cn["precision_matrix"],
-            partial_correlation=cn["partial_correlation"],
-            causal_adjacency=cn["causal_adjacency"],
-            topological_order=cn["topological_order"],
-            centrality_ranking=cn["centrality_ranking"],
-            bridge_centrality=cn.get("bridge_centrality", []),
+            precision_matrix=_to_json_serializable(cn["precision_matrix"]),
+            partial_correlation=_to_json_serializable(cn["partial_correlation"]),
+            causal_adjacency=_to_json_serializable(cn["causal_adjacency"]),
+            topological_order=_to_json_serializable(cn["topological_order"]),
+            centrality_ranking=_to_json_serializable(cn["centrality_ranking"]),
+            bridge_centrality=_to_json_serializable(cn.get("bridge_centrality", [])),
             bridge_symptoms=cn["bridge_symptoms"],
-            positive_feedback_loops=cn["positive_feedback_loops"],
+            positive_feedback_loops=_to_json_serializable(cn["positive_feedback_loops"]),
             variable_names=cn.get("variable_names", []),
         ),
         dynamics=dynamics_result,
@@ -213,50 +160,24 @@ async def assess_student(request: CuspNetAssessmentRequest, db: Session = Depend
     questionnaire_data = np.array([phq9 + gad7], dtype=float)
     variable_names = [f"PHQ9_{i}" for i in range(9)] + [f"GAD7_{i}" for i in range(7)]
 
-    if questionnaire_data.shape[0] < 2:
-        pss_norm = pss10 / 50.0
-        cdrisc_norm = cdrisc / 40.0
-        mspss_norm = mspss / 84.0
-        a = pss_norm - cdrisc_norm
-        b = cdrisc_norm * mspss_norm - 0.5
-        c = mspss_norm * 0.5
-        resilience = compute_resilience_reserve(a, b, c)
-        cd = compute_critical_distance(b)
-        warning = cd < 0.15
-        risk_score = min(1.0, (0.4 if resilience < 0.5 else 0.2) + (0.3 if warning else 0))
-        risk_level = "critical" if warning else ("high" if risk_score >= 0.7 else "medium" if risk_score >= 0.4 else "low")
-
-        l3_result = None
-        if request.text_input:
-            causal_info = {"central_symptoms": [], "top_loops": []}
-            dynamics_info = {"resilience_reserve": resilience, "critical_distance": cd, "tipping_point_warning": warning}
-            try:
-                l3_result = await run_in_threadpool(
-                    engine_instance.layer3.full_chain, request.text_input, causal_info, dynamics_info
-                )
-            except Exception:
-                pass
-
-        result = _build_single_sample_result(variable_names, a, b, c, resilience, cd, warning, risk_score, risk_level, l3_result)
+    if request.text_input:
+        result = await run_in_threadpool(
+            engine_instance.assess,
+            questionnaire_data=questionnaire_data,
+            variable_names=variable_names,
+            pss10=pss10,
+            cdrisc=cdrisc,
+            mspss=mspss,
+            text_input=request.text_input,
+        )
     else:
-        if request.text_input:
-            result = await run_in_threadpool(
-                engine_instance.assess,
-                questionnaire_data=questionnaire_data,
-                variable_names=variable_names,
-                pss10=pss10,
-                cdrisc=cdrisc,
-                mspss=mspss,
-                text_input=request.text_input,
-            )
-        else:
-            result = engine_instance.assess(
-                questionnaire_data=questionnaire_data,
-                variable_names=variable_names,
-                pss10=pss10,
-                cdrisc=cdrisc,
-                mspss=mspss,
-            )
+        result = engine_instance.assess(
+            questionnaire_data=questionnaire_data,
+            variable_names=variable_names,
+            pss10=pss10,
+            cdrisc=cdrisc,
+            mspss=mspss,
+        )
 
     _save_record(db, student.id, result)
     _last_assessment = result

@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Dict, List, Optional
 from app.cuspnet.layer1_causal import CausalDiscoveryLayer
-from app.cuspnet.utils import compute_resilience_reserve, compute_potential, find_fixed_points, classify_fixed_points
+from app.cuspnet.utils import compute_resilience_reserve, compute_potential, find_fixed_points, classify_fixed_points, detect_positive_feedback_loops, compute_loop_strength
 from app.cuspnet.layer3_llm import LazarusAppraisalChain
 from app.data.loaders import SachsLoader, NHANESLoader, KossakowskiLoader, DAICWOZLoader
 from app.experiments.baselines.ml_baselines import train_rf, train_xgb
@@ -172,7 +172,6 @@ def _run_ablation_cusp(
             if config["use_a_embedding"] and causal_adjacency is not None:
                 coupling_effect = np.mean(np.abs(causal_adjacency))
                 loop_coupling = 0.0
-                from app.cuspnet.utils import detect_positive_feedback_loops, compute_loop_strength
                 loops = detect_positive_feedback_loops(causal_adjacency)
                 if loops:
                     loop_coupling = np.mean([compute_loop_strength(causal_adjacency, lp) for lp in loops])
@@ -269,7 +268,7 @@ def _run_ablation_llm(
 
 def run_ablation(
     causal_dataset: str = "sachs",
-    cusp_dataset: str = "kossakowski",
+    cusp_dataset: str = "studentlife",
     llm_dataset: str = "daic_woz",
     window_size: int = 7,
     n_reflection_steps: int = 3,
@@ -289,14 +288,36 @@ def run_ablation(
         raise ValueError(f"Unknown causal dataset: {causal_dataset}")
 
     if cusp_dataset.lower() == "kossakowski":
-        cusp_loader = KossakowskiLoader()
-        df_cusp = cusp_loader.load()
-        if not df_cusp.empty:
-            series = df_cusp[["stress", "resilience", "social_support", "mood"]].values
-            stress_norm = series[:, 0] / (series[:, 0].max() + 1e-10)
-            resilience_norm = series[:, 1] / (series[:, 1].max() + 1e-10)
-            social_norm = series[:, 2] / (series[:, 2].max() + 1e-10)
-            X_cusp = np.column_stack([stress_norm, resilience_norm, social_norm, series[:, 3]])
+        raise FileNotFoundError(
+            "Kossakowski dataset has been replaced with official StudentLife data. "
+            "Please use cusp_dataset='studentlife' instead."
+        )
+    elif cusp_dataset.lower() == "studentlife":
+        from app.data.loaders import StudentLifeLoader
+        sl_loader = StudentLifeLoader()
+        sl_data = sl_loader.load()
+        phq9 = sl_data.get("phq9_series", {})
+        stress = sl_data.get("stress_series", {})
+        all_series = []
+        for pid in phq9:
+            phq_arr = np.array(phq9[pid])
+            stress_arr = np.array(stress.get(pid, [[0.5]] * len(phq_arr)))
+            if phq_arr.ndim == 1:
+                phq_arr = phq_arr.reshape(-1, 1)
+            if stress_arr.ndim == 1:
+                stress_arr = stress_arr.reshape(-1, 1)
+            phq_mean = np.mean(phq_arr, axis=1) if phq_arr.ndim > 1 else phq_arr
+            stress_mean = np.mean(stress_arr, axis=1) if stress_arr.ndim > 1 else stress_arr
+            n_rows = min(len(phq_mean), len(stress_mean))
+            combined_pid = np.column_stack([
+                stress_mean[:n_rows],
+                1.0 - phq_mean[:n_rows] / (np.max(np.abs(phq_mean[:n_rows])) + 1e-10),
+                np.ones(n_rows) * 0.5,
+                (phq_mean[:n_rows] > np.median(phq_mean[:n_rows])).astype(float),
+            ])
+            all_series.append(combined_pid)
+        if all_series:
+            X_cusp = np.vstack(all_series)
         else:
             X_cusp = np.random.RandomState(42).randn(100, 4)
     else:

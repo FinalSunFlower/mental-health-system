@@ -194,72 +194,63 @@ class DAICWOZLoader:
         data_dir = os.path.join(_RAW_DIR, "daic_woz")
         transcripts: Dict[str, str] = {}
         labels: Dict[str, int] = {}
-        if os.path.isdir(data_dir):
-            for fname in sorted(os.listdir(data_dir)):
-                fpath = os.path.join(data_dir, fname)
-                if fname.endswith("_TRANSCRIPT.csv") or fname.endswith("_transcript.csv"):
-                    pid = fname.split("_")[0]
-                    try:
-                        tdf = pd.read_csv(fpath, sep="\t", engine="python")
-                        text_parts = []
-                        for c in tdf.columns:
-                            if "value" in c.lower() or "text" in c.lower():
-                                vals = tdf[c].dropna().astype(str).tolist()
-                                text_parts.extend(vals)
-                        if not text_parts:
-                            text_parts = tdf.iloc[:, -1].dropna().astype(str).tolist()
-                        transcripts[pid] = " ".join(text_parts)
-                    except Exception:
-                        continue
 
-        if not transcripts:
-            csv_file = os.path.join(_RAW_DIR, "daic_woz.csv")
-            if os.path.exists(csv_file):
-                try:
-                    df = pd.read_csv(csv_file)
-                except Exception as e:
-                    raise ValueError(f"Failed to parse DAIC-WOZ CSV: {e}")
-                id_col = None
-                for c in df.columns:
-                    if "id" in c.lower() or "participant" in c.lower():
-                        id_col = c
-                        break
-                if id_col is None:
-                    id_col = df.columns[0]
-                text_col = None
-                for c in df.columns:
-                    if "transcript" in c.lower() or "text" in c.lower() or "response" in c.lower():
-                        text_col = c
-                        break
-                label_col = None
-                for c in df.columns:
-                    if "phq" in c.lower() or "score" in c.lower() or "label" in c.lower() or "depression" in c.lower():
-                        label_col = c
-                        break
-                for _, row in df.iterrows():
-                    pid = str(row[id_col])
-                    if text_col and text_col in row:
-                        transcripts[pid] = str(row[text_col]) if pd.notna(row[text_col]) else ""
-                    if label_col and label_col in row:
-                        try:
-                            labels[pid] = int(float(row[label_col]))
-                        except (ValueError, TypeError):
-                            labels[pid] = 0
-                return {"transcripts": transcripts, "labels": labels}
+        if not os.path.isdir(data_dir):
             raise FileNotFoundError(
-                f"DAIC-WOZ dataset not found at {data_dir} or {csv_file}. "
+                f"DAIC-WOZ dataset directory not found: {data_dir}\n"
                 "Please download from https://dcapswoz.ict.usc.edu/ "
-                "and place transcript files in app/data/raw/daic_woz/ "
-                "or a combined CSV as daic_woz.csv"
+                "(recommend 28 participants: 300-317, 318-329), "
+                "extract each *_P.zip into app/data/raw/daic_woz/"
             )
-        label_file = os.path.join(data_dir, "Labels.csv")
-        if not os.path.exists(label_file):
-            for alt in ["labels.csv", "scores.csv", "PHQ8_labels.csv"]:
-                alt_path = os.path.join(data_dir, alt)
-                if os.path.exists(alt_path):
-                    label_file = alt_path
+
+        for root, dirs, files in os.walk(data_dir):
+            for fname in files:
+                if not (fname.endswith("_TRANSCRIPT.csv") or fname.endswith("_transcript.csv")):
+                    continue
+                fpath = os.path.join(root, fname)
+                pid_base = fname.split("_TRANSCRIPT")[0].split("_transcript")[0]
+                pid = pid_base.replace("_P", "").replace("_", "")
+                try:
+                    tdf = pd.read_csv(fpath, sep="\t", engine="python", encoding="utf-8", errors="ignore")
+                    text_parts = []
+                    speaker_text = {}
+                    for _, row in tdf.iterrows():
+                        speaker = str(row.iloc[0]) if tdf.shape[1] > 0 else ""
+                        text_val = str(row.iloc[-1]) if tdf.shape[1] > 1 else ""
+                        if len(text_val) > 5 and text_val.lower() not in ("nan", "none", "", "sil", "[silence]"):
+                            spk_key = speaker.strip().lower()
+                            if "participant" in spk_key or "patient" in spk_key or spk_key == "p":
+                                speaker_text.setdefault("participant", []).append(text_val)
+                            elif "ellie" in spk_key or "interviewer" in spk_key or spk_key == "e":
+                                pass
+                            else:
+                                speaker_text.setdefault("other", []).append(text_val)
+                    if speaker_text.get("participant"):
+                        transcripts[pid] = " ".join(speaker_text["participant"])
+                    elif speaker_text.get("other"):
+                        transcripts[pid] = " ".join(speaker_text["other"])
+                    else:
+                        all_vals = tdf.iloc[:, -1].dropna().astype(str).tolist()
+                        transcripts[pid] = " ".join([v for v in all_vals if len(v) > 3])
+                except Exception:
+                    continue
+
+        label_file = None
+        for cand in ["Labels.csv", "labels.csv", "scores.csv", "PHQ8_labels.csv"]:
+            cpath = os.path.join(data_dir, cand)
+            if os.path.exists(cpath):
+                label_file = cpath
+                break
+        if not label_file:
+            for root, dirs, files in os.walk(data_dir):
+                for fname in files:
+                    fl = fname.lower()
+                    if "label" in fl or "phq" in fl or "score" in fl:
+                        if fname.endswith(".csv"):
+                            label_file = os.path.join(root, fname)
+                            break
+                if label_file:
                     break
-        if os.path.exists(label_file):
             try:
                 ldf = pd.read_csv(label_file)
                 id_col = ldf.columns[0]
@@ -332,8 +323,166 @@ class StudentLifeLoader:
         phq9_series: Dict[str, list] = {}
         stress_series: Dict[str, list] = {}
         sensor_data: Dict[str, dict] = {}
+
+        survey_dir = os.path.join(data_dir, "survey")
+        if os.path.isdir(survey_dir):
+            phq_file = os.path.join(survey_dir, "PHQ-9.csv")
+            if not os.path.exists(phq_file):
+                for alt in ["PHQ9.csv", "phq9.csv", "PHQ.csv"]:
+                    if os.path.exists(os.path.join(survey_dir, alt)):
+                        phq_file = os.path.join(survey_dir, alt)
+                        break
+            if os.path.exists(phq_file):
+                try:
+                    df = pd.read_csv(phq_file)
+                    phq_map = {
+                        "Not at all": 0, "Several days": 1,
+                        "More than half the days": 2, "Nearly every day": 3,
+                    }
+                    uid_col = None
+                    for c in df.columns:
+                        cl = c.lower().strip()
+                        if "uid" in cl or "id" in cl or "student" in cl or "participant" in cl:
+                            uid_col = c
+                            break
+                    if uid_col is None:
+                        uid_col = df.columns[0]
+                    skip_cols = {uid_col}
+                    for c in df.columns:
+                        if c.lower().strip() == "type" or c.lower().strip() == "response":
+                            skip_cols.add(c)
+                    phq_cols = [c for c in df.columns if c not in skip_cols]
+                    for _, row in df.iterrows():
+                        pid_raw = row[uid_col]
+                        pid = str(pid_raw).strip() if pd.notna(pid_raw) else str(len(phq9_series))
+                        vals = []
+                        for c in phq_cols:
+                            v = row[c]
+                            if pd.isna(v):
+                                vals.append(0.0)
+                            elif isinstance(v, (int, float)):
+                                vals.append(float(v))
+                            else:
+                                vals.append(float(phq_map.get(str(v).strip(), 0)))
+                        if vals:
+                            phq9_series[pid] = vals
+                except Exception:
+                    pass
+
+            pss_file = os.path.join(survey_dir, "PSS.csv")
+            if not os.path.exists(pss_file):
+                for alt in ["pss.csv", "Perceived_Stress_Scale.csv"]:
+                    if os.path.exists(os.path.join(survey_dir, alt)):
+                        pss_file = os.path.join(survey_dir, alt)
+                        break
+            if os.path.exists(pss_file):
+                try:
+                    df = pd.read_csv(pss_file)
+                    pss_map = {
+                        "Never": 0, "Almost never": 1,
+                        "Sometime": 2, "Sometimes": 2,
+                        "Fairly often": 3, "Very often": 4,
+                    }
+                    uid_col = None
+                    for c in df.columns:
+                        cl = c.lower().strip()
+                        if "uid" in cl or "id" in cl or "student" in cl:
+                            uid_col = c
+                            break
+                    if uid_col is None:
+                        uid_col = df.columns[0]
+                    skip_cols = {uid_col}
+                    for c in df.columns:
+                        if c.lower().strip() == "type":
+                            skip_cols.add(c)
+                    pss_cols = [c for c in df.columns if c not in skip_cols]
+                    for _, row in df.iterrows():
+                        pid_raw = row[uid_col]
+                        pid = str(pid_raw).strip() if pd.notna(pid_raw) else str(len(stress_series))
+                        vals = []
+                        for c in pss_cols:
+                            v = row[c]
+                            if pd.isna(v):
+                                vals.append(0.0)
+                            elif isinstance(v, (int, float)):
+                                vals.append(float(v))
+                            else:
+                                vals.append(float(pss_map.get(str(v).strip(), 2)))
+                        if vals:
+                            stress_series[pid] = vals
+                except Exception:
+                    pass
+
+        ema_dir = os.path.join(data_dir, "EMA")
+        if os.path.isdir(ema_dir) and not stress_series:
+            import json as _json
+            ema_response_dir = os.path.join(ema_dir, "response", "Stress")
+            if not os.path.isdir(ema_response_dir):
+                ema_response_dir = os.path.join(ema_dir, "Stress")
+            if os.path.isdir(ema_response_dir):
+                for fname in sorted(os.listdir(ema_response_dir)):
+                    if not fname.endswith(".json"):
+                        continue
+                    fpath = os.path.join(ema_response_dir, fname)
+                    pid = fname.replace(".json", "").replace("Stress_", "").replace("stress_", "")
+                    try:
+                        with open(fpath, "r", encoding="utf-8") as jf:
+                            entries = _json.load(jf)
+                        stress_vals = []
+                        for entry in entries:
+                            if isinstance(entry, dict):
+                                for key in ["level", "value", "score", "response"]:
+                                    if key in entry:
+                                        val = entry[key]
+                                        if isinstance(val, (int, float)):
+                                            stress_vals.append(float(val))
+                                        elif isinstance(val, str):
+                                            try:
+                                                stress_vals.append(float(val))
+                                            except ValueError:
+                                                pass
+                                        break
+                        if stress_vals and len(stress_vals) >= 3:
+                            stress_series[pid] = stress_vals
+                    except Exception:
+                        continue
+
+            if not stress_series:
+                ema_stress_files = []
+                for root, dirs, files in os.walk(ema_dir):
+                    for fn in files:
+                        fl = fn.lower()
+                        if ("stress" in fl or "pam" in fl) and fn.endswith(".csv"):
+                            ema_stress_files.append(os.path.join(root, fn))
+                for sf in sorted(ema_stress_files)[:3]:
+                    try:
+                        df = pd.read_csv(sf)
+                        df = df.apply(pd.to_numeric, errors="coerce")
+                        uid_col = None
+                        val_col = None
+                        for c in df.columns:
+                            cl = c.lower().strip()
+                            if "uid" in cl or "id" in cl:
+                                uid_col = c
+                            elif "stress" in cl or "value" in cl or "score" in cl or "response" in cl:
+                                val_col = c
+                        if uid_col is None:
+                            uid_col = df.columns[0]
+                        if val_col is None:
+                            val_col = df.columns[-1]
+                        ema_by_uid = {}
+                        for _, row in df.iterrows():
+                            pid = str(int(row[uid_col])) if pd.notna(row[uid_col]) else "unknown"
+                            val = float(row[val_col]) if pd.notna(row[val_col]) else 0.0
+                            ema_by_uid.setdefault(pid, []).append(val)
+                        for pid, vals in ema_by_uid.items():
+                            if pid not in stress_series:
+                                stress_series[pid] = vals
+                    except Exception:
+                        continue
+
         phq_dir = os.path.join(data_dir, "phq9")
-        if os.path.isdir(phq_dir):
+        if not phq9_series and os.path.isdir(phq_dir):
             for fname in sorted(os.listdir(phq_dir)):
                 if fname.endswith(".csv"):
                     pid = fname.replace(".csv", "").replace("phq9_", "").replace("student_", "")
@@ -342,11 +491,12 @@ class StudentLifeLoader:
                         df = pd.read_csv(fpath)
                         df = df.apply(pd.to_numeric, errors="coerce")
                         df = df.fillna(df.mean())
-                        phq9_series[pid] = df.values.tolist()
+                        phq9_series[pid] = df.values.flatten().tolist()
                     except Exception:
                         continue
+
         stress_dir = os.path.join(data_dir, "stress")
-        if os.path.isdir(stress_dir):
+        if not stress_series and os.path.isdir(stress_dir):
             for fname in sorted(os.listdir(stress_dir)):
                 if fname.endswith(".csv"):
                     pid = fname.replace(".csv", "").replace("stress_", "").replace("student_", "")
@@ -355,9 +505,10 @@ class StudentLifeLoader:
                         df = pd.read_csv(fpath)
                         df = df.apply(pd.to_numeric, errors="coerce")
                         df = df.fillna(df.mean())
-                        stress_series[pid] = df.values.tolist()
+                        stress_series[pid] = df.values.flatten().tolist()
                     except Exception:
                         continue
+
         sensor_dir = os.path.join(data_dir, "sensing")
         if os.path.isdir(sensor_dir):
             for fname in sorted(os.listdir(sensor_dir)):
@@ -371,6 +522,7 @@ class StudentLifeLoader:
                         sensor_data[sensor_type] = df.values.tolist()
                     except Exception:
                         continue
+
         return {
             "phq9_series": phq9_series,
             "stress_series": stress_series,

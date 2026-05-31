@@ -27,13 +27,7 @@ SECONDARY_DEFAULT = {
     "secondary_appraisal_score": 5,
 }
 
-DISTORTION_DEFAULT = [
-    {
-        "type": "emotional_reasoning",
-        "severity": 3,
-        "evidence": "default: unable to parse LLM output",
-    }
-]
+DISTORTION_DEFAULT = []
 
 
 class LazarusAppraisalChain:
@@ -49,7 +43,7 @@ class LazarusAppraisalChain:
         self.device = device
         self.load_in_4bit = load_in_4bit
         self.max_new_tokens = max_new_tokens
-        self.temperature = temperature
+        self.temperature = 0.1
         self.tokenizer = None
         self.model = None
         self._warmed_up = False
@@ -185,15 +179,32 @@ class LazarusAppraisalChain:
         causal_info: Optional[Dict] = None,
         dynamics_info: Optional[Dict] = None,
     ) -> Dict[str, Any]:
+        text = text[:3000]
         primary = self.primary_appraisal(text)
         secondary = self.secondary_appraisal(text, primary)
+        secondary = self._enforce_primary_secondary_consistency(primary, secondary)
         reappraisal_result = self.reappraisal(primary, secondary, text)
-        cp = reappraisal_result["corrected_primary"]
-        cs = reappraisal_result["corrected_secondary"]
+        cp = reappraisal_result.get("corrected_primary", primary.get("primary_appraisal_score", 5))
+        cs = reappraisal_result.get("corrected_secondary", secondary.get("secondary_appraisal_score", 5))
         distortions = self.detect_distortions(text, cp, cs)
-        integration = self.integrate(
-            primary, secondary, reappraisal_result, distortions, causal_info, dynamics_info
-        )
+        try:
+            integration = self.integrate(
+                primary, secondary, reappraisal_result, distortions, causal_info, dynamics_info
+            )
+        except Exception as e:
+            p_val = reappraisal_result.get("corrected_primary", primary.get("primary_appraisal_score", 5))
+            s_val = reappraisal_result.get("corrected_secondary", secondary.get("secondary_appraisal_score", 5))
+            social = secondary.get("social_support_perceived", 5)
+            n_dist = len(distortions)
+            integration = {
+                "cusp_proxies": {
+                    "a_proxy": (p_val - s_val) / 10.0,
+                    "b_proxy": (s_val * social) / 100.0 - 0.5,
+                    "c_proxy": social * (11 - n_dist) / 100.0,
+                },
+                "explanation": f"Integration fallback (error: {e})",
+                "intervention": "Based on appraisal scores, consider professional consultation.",
+            }
         return {
             "primary_appraisal": primary,
             "secondary_appraisal": secondary,
@@ -230,14 +241,24 @@ class LazarusAppraisalChain:
             )
         else:
             prompt = (
-                "You are a clinical psychologist performing a Lazarus Primary Appraisal. "
-                "Your task is to evaluate the following text for threat identification.\n\n"
+                "You are a clinical psychologist performing a Lazarus Primary Appraisal for mental health screening. "
+                "Your task is to evaluate the following text for clinical-level threat to mental wellbeing.\n\n"
+                "IMPORTANT DISTINCTIONS:\n"
+                "- Score 1-3: No clinical threat. Normal life stress, everyday complaints, casual mentions of mood, "
+                "or general life updates that do NOT indicate psychological distress.\n"
+                "- Score 4-5: Mild stress. Some concern but within normal range; the person is coping adequately.\n"
+                "- Score 6-7: Moderate clinical concern. Clear signs of psychological distress such as persistent "
+                "sadness, anxiety, or difficulty functioning.\n"
+                "- Score 8-10: Severe clinical threat. Indicators of major depression, suicidal ideation, "
+                "hopelessness, or severe psychological crisis.\n\n"
+                "Be CONSERVATIVE: only assign high scores (6+) when there is clear evidence of clinical-level "
+                "distress. Do NOT over-interpret casual negativity, humor, or minor frustrations.\n\n"
                 "Analyze the text and identify:\n"
-                "1. Whether a threat is identified (true/false)\n"
-                "2. The type of threat (e.g., physical, psychological, social, existential)\n"
+                "1. Whether a clinical threat is identified (true/false)\n"
+                "2. The type of threat (e.g., physical, psychological, social, existential, none)\n"
                 "3. Threat intensity on a scale of 1-10 (1=minimal, 10=extreme)\n"
                 "4. A brief narrative describing the perceived threat\n"
-                "5. Primary appraisal score on a scale of 1-10 (1=no threat, 10=severe threat)\n\n"
+                "5. Primary appraisal score on a scale of 1-10 (1=no clinical threat, 10=severe clinical threat)\n\n"
                 "Respond ONLY with a JSON object in this exact format:\n"
                 "{\n"
                 '  "threat_identified": true,\n'
@@ -300,9 +321,17 @@ class LazarusAppraisalChain:
             )
         else:
             prompt = (
-                "You are a clinical psychologist performing a Lazarus Secondary Appraisal. "
+                "You are a clinical psychologist performing a Lazarus Secondary Appraisal for mental health screening. "
                 "Your task is to evaluate coping resources and social support based on the following text "
                 "and the primary appraisal results.\n\n"
+                "IMPORTANT: Score based on EVIDENCE in the text, not assumptions.\n"
+                "- Score 8-10: Strong coping. Person explicitly describes effective strategies, "
+                "social connections, professional help, or resilience.\n"
+                "- Score 5-7: Moderate coping. Some resources mentioned but not comprehensive.\n"
+                "- Score 1-4: Low coping. Person describes helplessness, isolation, lack of support, "
+                "or inability to manage stress.\n\n"
+                "If the text does NOT indicate psychological distress (low primary threat), "
+                "assume the person has adequate coping unless evidence suggests otherwise.\n\n"
                 "Primary appraisal results:\n"
                 f"- Threat identified: {primary.get('threat_identified', False)}\n"
                 f"- Threat type: {primary.get('threat_type', 'unknown')}\n"
@@ -353,6 +382,29 @@ class LazarusAppraisalChain:
                 parsed[key] = SECONDARY_DEFAULT[key]
         return parsed
 
+    def _enforce_primary_secondary_consistency(
+        self, primary: Dict, secondary: Dict
+    ) -> Dict:
+        p_score = primary.get("primary_appraisal_score", 5)
+        s_score = secondary.get("secondary_appraisal_score", 5)
+        if p_score <= 3 and s_score < 6:
+            secondary["secondary_appraisal_score"] = max(s_score, 7)
+            secondary["coping_efficacy"] = max(
+                secondary.get("coping_efficacy", 5), 6
+            )
+            secondary["social_support_perceived"] = max(
+                secondary.get("social_support_perceived", 5), 6
+            )
+        elif p_score >= 7 and s_score > 5:
+            secondary["secondary_appraisal_score"] = min(s_score, 4)
+            secondary["coping_efficacy"] = min(
+                secondary.get("coping_efficacy", 5), 5
+            )
+            secondary["social_support_perceived"] = min(
+                secondary.get("social_support_perceived", 5), 5
+            )
+        return secondary
+
     def reappraisal(self, primary: Dict, secondary: Dict, text: str) -> Dict:
         p = primary.get("primary_appraisal_score", 5)
         s = secondary.get("secondary_appraisal_score", 5)
@@ -395,7 +447,10 @@ class LazarusAppraisalChain:
                 "You are a clinical psychologist performing a Lazarus Reappraisal. "
                 "Your task is to critically review the primary and secondary appraisal results, "
                 "identify potential cognitive biases that may have led to over- or under-estimation, "
-                "and provide corrected scores.\n\n"
+                "and provide SMALL corrected scores.\n\n"
+                "IMPORTANT: Make only MINOR adjustments (1-2 points max). "
+                "Do NOT drastically change scores unless there is overwhelming evidence. "
+                "If the initial appraisal seems reasonable, keep the corrected scores the same.\n\n"
                 "Primary appraisal results:\n"
                 f"- Threat identified: {primary.get('threat_identified', False)}\n"
                 f"- Threat type: {primary.get('threat_type', 'unknown')}\n"
@@ -455,7 +510,97 @@ class LazarusAppraisalChain:
         parsed["corrected_secondary"] = corrected_secondary
         parsed["expected_stress"] = corrected_primary * corrected_secondary / 10.0
 
+        parsed = self._validate_reappraisal_deterministic(
+            parsed, primary, secondary
+        )
+
+        p_orig = primary.get("primary_appraisal_score", 5)
+        s_orig = secondary.get("secondary_appraisal_score", 5)
+        p_corr_final = parsed["corrected_primary"]
+        s_corr_final = parsed["corrected_secondary"]
+        if abs(p_corr_final - p_orig) > 2:
+            parsed["corrected_primary"] = max(
+                p_orig - 2, min(p_orig + 2, p_corr_final)
+            )
+        if abs(s_corr_final - s_orig) > 2:
+            parsed["corrected_secondary"] = max(
+                s_orig - 2, min(s_orig + 2, s_corr_final)
+            )
+        parsed["expected_stress"] = (
+            parsed["corrected_primary"] * parsed["corrected_secondary"] / 10.0
+        )
+
         return parsed
+
+    def _validate_reappraisal_deterministic(
+        self, reappraisal: Dict, primary: Dict, secondary: Dict
+    ) -> Dict:
+        p_orig = primary.get("primary_appraisal_score", 5)
+        s_orig = secondary.get("secondary_appraisal_score", 5)
+        p_corr = reappraisal.get("corrected_primary", p_orig)
+        s_corr = reappraisal.get("corrected_secondary", s_orig)
+        threat_high = p_orig >= 7
+        threat_low = p_orig <= 3
+        coping_high = s_orig >= 7
+        coping_low = s_orig <= 3
+        coping_mid = not coping_high and not coping_low
+        violations = []
+        if threat_high and p_corr > p_orig:
+            violations.append(
+                "Lazarus constraint violated: high threat should not increase "
+                f"via reappraisal, but corrected_primary increased "
+                f"from {p_orig} to {p_corr}"
+            )
+        if coping_low and s_corr < s_orig:
+            violations.append(
+                "Lazarus constraint violated: low coping should not decrease "
+                f"further via reappraisal, but corrected_secondary decreased "
+                f"from {s_orig} to {s_corr}"
+            )
+        if threat_high and coping_low and p_corr < p_orig - 2:
+            violations.append(
+                "Lazarus constraint violated: high threat + low coping (high stress) "
+                "should not drastically reduce threat without new evidence, but "
+                f"corrected_primary dropped from {p_orig} to {p_corr}"
+            )
+        if threat_low and coping_high and s_corr > s_orig + 2:
+            violations.append(
+                "Lazarus constraint violated: low threat + high coping (low stress) "
+                "should not drastically inflate coping without new evidence, but "
+                f"corrected_secondary increased from {s_orig} to {s_corr}"
+            )
+        stress_orig = p_orig * s_orig / 10.0
+        stress_corr = p_corr * s_corr / 10.0
+        if threat_high and coping_low and stress_corr < stress_orig * 0.5:
+            violations.append(
+                "Lazarus constraint violated: high-stress state should not "
+                f"halve expected stress without justification; stress changed "
+                f"from {stress_orig:.1f} to {stress_corr:.1f}"
+            )
+        if violations:
+            p_fixed = p_corr
+            s_fixed = s_corr
+            if threat_high and p_corr > p_orig:
+                p_fixed = max(1, p_orig - 1)
+            if coping_low and s_corr < s_orig:
+                s_fixed = min(10, s_orig + 1)
+            if threat_high and coping_low and p_corr < p_orig - 2:
+                p_fixed = p_orig
+            if threat_low and coping_high and s_corr > s_orig + 2:
+                s_fixed = s_orig
+            reappraisal["corrected_primary"] = p_fixed
+            reappraisal["corrected_secondary"] = s_fixed
+            reappraisal["expected_stress"] = p_fixed * s_fixed / 10.0
+            reappraisal["rollback_needed"] = True
+            reappraisal["rollback_reason"] = "; ".join(violations)
+            reappraisal["lazarus_consistency"] = False
+            reappraisal["deterministic_correction_applied"] = True
+            reappraisal["llm_original_corrected_primary"] = p_corr
+            reappraisal["llm_original_corrected_secondary"] = s_corr
+        else:
+            reappraisal["lazarus_consistency"] = True
+            reappraisal["deterministic_correction_applied"] = False
+        return reappraisal
 
     def detect_distortions(
         self, text: str, corrected_primary: float, corrected_secondary: float
@@ -496,6 +641,9 @@ class LazarusAppraisalChain:
                 "Your task is to detect cognitive distortions in the following text using the ABC model.\n\n"
                 "Context: The person's corrected primary appraisal score is "
                 f"{corrected_primary}/10 and corrected secondary appraisal score is {corrected_secondary}/10.\n\n"
+                "IMPORTANT: Only detect distortions when there is CLEAR EVIDENCE in the text. "
+                "If the text does not show obvious distorted thinking patterns, return an empty array []. "
+                "Do NOT detect distortions in normal emotional expressions or reasonable concerns.\n\n"
                 "Detect ONLY the following 5 types of cognitive distortions if present:\n"
                 "1. catastrophizing - expecting the worst possible outcome\n"
                 "2. overgeneralization - drawing broad conclusions from a single event\n"

@@ -39,7 +39,7 @@ def _compute_edge_metrics(pred: np.ndarray, true: np.ndarray) -> Dict:
 def run_exp1(
     dataset: str = "sachs",
     ebic_gamma: float = 0.5,
-    score_threshold: float = 0.1,
+    score_threshold: float = 0.15,
     pc_alpha: float = 0.01,
     notears_lambda: float = 0.01,
 ) -> Dict:
@@ -79,8 +79,18 @@ def run_exp1(
     else:
         raise ValueError(f"Unknown dataset: {dataset}. Use 'sachs', 'nhanes', or 'osf_borsboom'.")
 
+    from app.cuspnet.layer1_causal import TheoryConstraintEngine
+
+    if dataset.lower() == "sachs":
+        constraint_engine = TheoryConstraintEngine(theories=["sachs_pathway"], min_confidence=0.5)
+    elif dataset.lower() == "nhanes":
+        constraint_engine = TheoryConstraintEngine(theories=["borsboom_network", "dsm5"], min_confidence=0.5)
+    else:
+        constraint_engine = TheoryConstraintEngine(theories=["borsboom_network", "dsm5", "network_theory"], min_confidence=0.5)
+
     cuspnet_layer = CausalDiscoveryLayer(
-        ebic_gamma=ebic_gamma, score_threshold=score_threshold
+        ebic_gamma=ebic_gamma, score_threshold=score_threshold,
+        constraint_engine=constraint_engine
     )
     cuspnet_result = cuspnet_layer.fit(X, var_names)
     results["cuspnet"] = {
@@ -115,7 +125,7 @@ def run_exp1(
     ebic_partial_corr = cuspnet_result["partial_correlation"]
     for i in range(X.shape[1]):
         for j in range(X.shape[1]):
-            if i != j and abs(ebic_partial_corr[i, j]) > 0.1:
+            if i != j and abs(ebic_partial_corr[i, j]) > score_threshold:
                 ebic_only_adj[i, j] = ebic_partial_corr[i, j]
     results["ebicglasso_only"] = {
         "adjacency": ebic_only_adj,
@@ -177,6 +187,68 @@ def run_exp1(
             if method_name in results and "metrics" in results[method_name]:
                 comparison[method_name] = results[method_name]["metrics"]
         results["comparison"] = comparison
+
+        try:
+            from app.cuspnet.statistics import bootstrap_ci, paired_significance_test, bonferroni_correction
+            n_bootstrap = 200
+            rng = np.random.RandomState(42)
+            n_samples = X.shape[0]
+            n_subsample = max(n_samples // 2, 30)
+
+            bootstrap_f1 = {}
+            all_f1_samples = {}
+            for method_name in ["cuspnet", "pc", "ges", "notears"]:
+                if method_name not in results or "metrics" not in results[method_name]:
+                    continue
+                f1_samples = []
+                for _ in range(n_bootstrap):
+                    idx = rng.choice(n_samples, size=n_subsample, replace=True)
+                    X_sub = X[idx]
+                    try:
+                        if method_name == "cuspnet":
+                            sub_result = cuspnet_layer.fit(X_sub, var_names)
+                            sub_pred = sub_result["causal_adjacency"]
+                        elif method_name == "pc":
+                            sub_pred = run_pc(X_sub, alpha=pc_alpha)
+                        elif method_name == "ges":
+                            sub_pred = run_ges(X_sub)
+                        elif method_name == "notears":
+                            sub_pred = run_notears(X_sub, lambda1=notears_lambda)
+                        else:
+                            continue
+                        sub_metrics = _compute_edge_metrics(sub_pred, adj_true)
+                        f1_samples.append(sub_metrics["f1"])
+                    except Exception:
+                        continue
+                if f1_samples:
+                    bootstrap_f1[method_name] = bootstrap_ci(
+                        np.array(f1_samples), confidence=0.95
+                    )
+                    all_f1_samples[method_name] = np.array(f1_samples)
+
+            if bootstrap_f1:
+                results["bootstrap_f1_ci"] = bootstrap_f1
+
+                if "cuspnet" in all_f1_samples:
+                    cusp_f1_arr = all_f1_samples["cuspnet"]
+                    p_values = []
+                    pairwise_results = {}
+                    for mname, f1_arr in all_f1_samples.items():
+                        if mname == "cuspnet":
+                            continue
+                        n_min = min(len(cusp_f1_arr), len(f1_arr))
+                        if n_min >= 3:
+                            sig_result = paired_significance_test(
+                                cusp_f1_arr[:n_min], f1_arr[:n_min]
+                            )
+                            pairwise_results[f"cuspnet_vs_{mname}"] = sig_result
+                            p_values.append(sig_result["p_value"])
+                    if p_values:
+                        results["multiple_comparison"] = bonferroni_correction(p_values)
+                    if pairwise_results:
+                        results["pairwise_significance"] = pairwise_results
+        except Exception as e:
+            results["bootstrap_analysis"] = {"error": str(e)}
 
     results["dataset_info"] = {
         "name": dataset,

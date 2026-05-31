@@ -3,12 +3,18 @@ from typing import List, Dict
 
 
 def sigmoid(x: np.ndarray, tau: float = 0.5, k: float = 10.0) -> np.ndarray:
-    return 1.0 / (1.0 + np.exp(-k * (x - tau)))
+    z = np.clip(-k * (x - tau), -500, 500)
+    return 1.0 / (1.0 + np.exp(z))
 
 
 def solve_cubic(a: float, b: float, c: float) -> List[float]:
     roots = np.roots([c, 0, -b, -a])
-    return sorted([r.real for r in roots if abs(r.imag) < 1e-10])
+    real_roots = sorted([r.real for r in roots if abs(r.imag) < 1e-10])
+    deduped = []
+    for r in real_roots:
+        if not deduped or abs(r - deduped[-1]) > 1e-8:
+            deduped.append(r)
+    return deduped
 
 
 def compute_potential(x: np.ndarray, a: float, b: float, c: float) -> np.ndarray:

@@ -13,10 +13,10 @@ from app.experiments.exp4_llm_appraisal import run_exp4
 
 try:
     results = run_exp4(
-        dataset="daic_woz",
+        dataset="erisk",
         use_lazarus_constraints=True,
         n_reflection_steps=3,
-        max_samples=10,
+        max_samples=40,
         model_name=r"D:\Models\huggingface\Qwen3.5-2B",
     )
 
@@ -55,6 +55,15 @@ try:
         print("  Distortion F1 delta:     %+.4f" % comp["distortion_f1"])
         print("  Depression level acc:    %+.4f" % comp["depression_level_accuracy"])
         print("  Depression level kappa:  %+.4f" % comp["depression_level_kappa"])
+
+    if "binary_classification" in results:
+        bc = results["binary_classification"]
+        print("\n--- Binary Classification (Clinical vs Non-clinical) ---")
+        fc_bin = bc["full_chain"]
+        po_bin = bc["primary_only"]
+        print(f"  Full Chain:  acc={fc_bin['accuracy']:.4f} F1={fc_bin['f1']:.4f} prec={fc_bin['precision']:.4f} rec={fc_bin['recall']:.4f}")
+        print(f"  Primary Only: acc={po_bin['accuracy']:.4f} F1={po_bin['f1']:.4f} prec={po_bin['precision']:.4f} rec={po_bin['recall']:.4f}")
+        print(f"  N samples: {bc['n_samples']} (pos={bc['n_positive']}, neg={bc['n_negative']})")
 
     if "pearson_correlation" in results:
         pc = results["pearson_correlation"]

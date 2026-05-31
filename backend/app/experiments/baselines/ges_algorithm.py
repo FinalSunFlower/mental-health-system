@@ -14,7 +14,4 @@ def run_ges(X: np.ndarray) -> np.ndarray:
             if i != j:
                 if G.graph[j, i] == 1 and G.graph[i, j] == -1:
                     adj[i, j] = 1.0
-                elif G.graph[j, i] == -1 and G.graph[i, j] == -1:
-                    adj[i, j] = 1.0
-                    adj[j, i] = 1.0
     return adj

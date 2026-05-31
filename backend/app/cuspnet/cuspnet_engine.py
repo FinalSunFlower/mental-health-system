@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Dict, Optional, List
-from .layer1_causal import CausalDiscoveryLayer
+from .layer1_causal import CausalDiscoveryLayer, TheoryConstraintEngine
 from .layer2_dynamics import CuspDynamicsLayer
 from .layer3_llm import LazarusAppraisalChain
-from .utils import compute_resilience_reserve, find_fixed_points, classify_fixed_points
+from .utils import compute_resilience_reserve, compute_potential
 
 
 PARAM_RANGES = {
@@ -18,13 +18,29 @@ PROXY_RANGES = {
     "c": {"min": 0.0, "max": 1.1},
 }
 
+QUESTIONNAIRE_RELIABILITY = {
+    "pss10": {"alpha": 0.86, "test_retest": 0.72},
+    "cdrisc": {"alpha": 0.89, "test_retest": 0.80},
+    "mspss": {"alpha": 0.88, "test_retest": 0.85},
+}
+
+LLM_PROXY_BASE_RELIABILITY = {"alpha": 0.70, "test_retest": 0.55}
+
 
 class CuspNetEngine:
     def __init__(self, config: Optional[Dict] = None):
         config = config or {}
+        constraint_theories = config.get("constraint_theories", ["borsboom_network"])
+        constraint_config = config.get("constraint_config_path", None)
+        constraint_engine = TheoryConstraintEngine(
+            theories=constraint_theories,
+            config_path=constraint_config,
+            min_confidence=config.get("constraint_min_confidence", 0.5),
+        )
         self.layer1 = CausalDiscoveryLayer(
             ebic_gamma=config.get("ebic_gamma", 0.5),
             score_threshold=config.get("score_threshold", 0.01),
+            constraint_engine=constraint_engine,
         )
         self.layer2 = CuspDynamicsLayer(
             theta_bifurcation=config.get("theta_bifurcation", 0.5),
@@ -32,6 +48,8 @@ class CuspNetEngine:
             lambda_b=config.get("lambda_b", 0.3),
             lambda_c=config.get("lambda_c", 0.2),
             drift_eta=config.get("drift_eta", 0.1),
+            norm_method=config.get("norm_method", "zscore_to_01"),
+            norm_group=config.get("norm_group", "general"),
         )
         self.layer3 = LazarusAppraisalChain(
             model_name=config.get("llm_model_name", r"D:\Models\huggingface\Qwen3.5-2B"),
@@ -129,11 +147,24 @@ class CuspNetEngine:
                     "delta_a": float(drifted_a - a_fused),
                     "resilience_at_drift": float(updated_resilience),
                 }
+            elif updated_resilience == float("inf"):
+                l2_result["drift_prediction"] = {
+                    "current_a": float(a_fused),
+                    "drifted_a_next": float(a_fused),
+                    "delta_a": 0.0,
+                    "resilience_at_drift": float(updated_resilience),
+                    "note": "monostable_system_no_drift",
+                }
             else:
-                l2_result["drift_prediction"] = None
+                drifted_a = self.layer2.state_dependent_drift(a_fused, updated_resilience)
+                l2_result["drift_prediction"] = {
+                    "current_a": float(a_fused),
+                    "drifted_a_next": float(drifted_a),
+                    "delta_a": float(drifted_a - a_fused),
+                    "resilience_at_drift": float(updated_resilience),
+                }
 
             x_range = np.linspace(-2, 2, 200)
-            from .utils import compute_potential
             l2_result["potential_function"] = {
                 "a": a_fused,
                 "b": b_fused,
@@ -165,6 +196,30 @@ class CuspNetEngine:
                 except Exception:
                     l2_result["simulation"] = None
 
+        if l2_result.get("simulation") is None:
+            try:
+                a_local, b_local, c_local = self.layer2.allocate_params(
+                    l2_result["global_a"], l2_result["global_b"], l2_result["global_c"],
+                    centrality, bridge_centrality,
+                )
+                sim = self.layer2.simulate_network_ode(
+                    x0, a_local, b_local, c_local,
+                    l1_result["causal_adjacency"], t_span,
+                )
+                l2_result["simulation"] = sim.tolist()
+                if "local_params" not in l2_result or l2_result["local_params"][0].get("a") == l2_result["global_a"]:
+                    l2_result["local_params"] = [
+                        {
+                            "name": variable_names[i] if i < len(variable_names) else f"V{i}",
+                            "a": float(a_local[i]),
+                            "b": float(b_local[i]),
+                            "c": float(c_local[i]),
+                        }
+                        for i in range(len(a_local))
+                    ]
+            except Exception:
+                l2_result["simulation"] = None
+
         if l2_result.get("drift_prediction") is not None:
             l2_result["drifted_a_next"] = l2_result["drift_prediction"]["drifted_a_next"]
         elif l2_result["resilience_reserve"] != float("inf") and l2_result["resilience_reserve"] < 1.0:
@@ -186,7 +241,7 @@ class CuspNetEngine:
         self._history_c.append(l2_result["global_c"])
 
         risk_score = self._compute_risk_score(l2_result)
-        risk_level = self._classify_risk(risk_score, l2_result["tipping_point_warning"])
+        risk_level = self._classify_risk(risk_score, l2_result["tipping_point_warning"], l2_result)
 
         result = {
             "risk_score": risk_score,
@@ -208,6 +263,9 @@ class CuspNetEngine:
         q_history = {"a": self._history_a, "b": self._history_b, "c": self._history_c}[param_name]
         p_history = {"a": self._proxy_history_a, "b": self._proxy_history_b, "c": self._proxy_history_c}[param_name]
 
+        q_reliability = self._estimate_questionnaire_reliability(param_name)
+        p_reliability = self._estimate_proxy_reliability(param_name, p_history)
+
         if len(q_history) >= 3 and len(p_history) >= 3:
             q_arr = np.array(q_history)
             q_mu = np.mean(q_arr)
@@ -223,8 +281,14 @@ class CuspNetEngine:
 
             z_q = (questionnaire_val - q_mu) / q_sigma
             z_p = (proxy_val - p_mu) / p_sigma
-            z_fused = 0.5 * z_q + 0.5 * z_p
 
+            w_q = q_reliability / (q_sigma ** 2)
+            w_p = p_reliability / (p_sigma ** 2)
+            w_total = w_q + w_p
+            if w_total < 1e-20:
+                w_total = 1e-20
+
+            z_fused = (w_q * z_q + w_p * z_p) / w_total
             fused_val = z_fused * q_sigma + q_mu
             return float(fused_val)
         else:
@@ -232,28 +296,103 @@ class CuspNetEngine:
             p_norm = (proxy_val - p_min) / (p_max - p_min + 1e-10)
             q_norm = max(0.0, min(1.0, q_norm))
             p_norm = max(0.0, min(1.0, p_norm))
-            fused_norm = 0.5 * q_norm + 0.5 * p_norm
+
+            w_q = q_reliability
+            w_p = p_reliability
+            w_total = w_q + w_p
+            if w_total < 1e-20:
+                w_total = 1e-20
+
+            fused_norm = (w_q * q_norm + w_p * p_norm) / w_total
             return float(fused_norm * (q_max - q_min) + q_min)
 
-    def _compute_risk_score(self, dynamics: Dict) -> float:
-        score = 0.0
-        if dynamics.get("attractor_states", {}).get("is_bistable", False):
-            score += 0.3
-        rv = dynamics.get("resilience_reserve", float("inf"))
-        if rv < 0.1:
-            score += 0.4
-        elif rv < 0.5:
-            score += 0.2
-        cd = dynamics.get("critical_distance", 1.0)
-        if cd < 0.15:
-            score += 0.3
-        elif cd < 0.3:
-            score += 0.1
-        return min(1.0, score)
+    def _estimate_questionnaire_reliability(self, param_name: str) -> float:
+        param_to_scale = {"a": "pss10", "b": "cdrisc", "c": "mspss"}
+        scale = param_to_scale.get(param_name, "pss10")
+        rel = QUESTIONNAIRE_RELIABILITY.get(scale, {"alpha": 0.80, "test_retest": 0.70})
+        alpha = rel.get("alpha", 0.80)
+        test_retest = rel.get("test_retest", 0.70)
+        return (alpha + test_retest) / 2.0
 
-    def _classify_risk(self, score: float, tipping_warning: bool) -> str:
+    def _estimate_proxy_reliability(self, param_name: str, proxy_history: List[float]) -> float:
+        base = (LLM_PROXY_BASE_RELIABILITY["alpha"] + LLM_PROXY_BASE_RELIABILITY["test_retest"]) / 2.0
+        if len(proxy_history) >= 3:
+            arr = np.array(proxy_history)
+            coeff_var = np.std(arr) / (np.abs(np.mean(arr)) + 1e-10)
+            consistency_bonus = max(0.0, 0.1 * (1.0 - min(coeff_var, 1.0)))
+            return min(base + consistency_bonus, 0.95)
+        return base
+
+    def _compute_risk_score(self, dynamics: Dict) -> float:
+        a = dynamics.get("global_a", 0.0)
+        b = dynamics.get("global_b", 0.0)
+        c = dynamics.get("global_c", 1.0)
+
+        is_bistable = dynamics.get("attractor_states", {}).get("is_bistable", False)
+        rv = dynamics.get("resilience_reserve", float("inf"))
+        cd = dynamics.get("critical_distance", 1.0)
+
+        if is_bistable and rv != float("inf") and rv > 0:
+            R_bistable = 1.0 - np.tanh(rv)
+        else:
+            R_bistable = 0.0
+
+        if is_bistable and cd > 1e-10:
+            R_critical = np.exp(-2.0 * cd)
+        elif is_bistable and cd <= 1e-10:
+            R_critical = 1.0
+        else:
+            R_critical = 0.0
+
+        fixed_points = dynamics.get("attractor_states", {}).get("fixed_points", [])
+        stable_fps = [fp for fp in fixed_points if fp.get("stability") == "stable"]
+        unstable_fps = [fp for fp in fixed_points if fp.get("stability") == "unstable"]
+
+        R_attractor = 0.0
+        if len(stable_fps) >= 2 and len(unstable_fps) >= 1:
+            healthy_fp = min(stable_fps, key=lambda fp: abs(fp.get("value", 0)))
+            pathological_fp = max(stable_fps, key=lambda fp: abs(fp.get("value", 0)))
+            V_healthy = float(compute_potential(np.array([healthy_fp["value"]]), a, b, c)[0])
+            V_pathological = float(compute_potential(np.array([pathological_fp["value"]]), a, b, c)[0])
+            V_unstable = float(compute_potential(np.array([unstable_fps[0]["value"]]), a, b, c)[0])
+
+            depth_healthy = V_unstable - V_healthy
+            depth_pathological = V_unstable - V_pathological
+
+            if depth_healthy > 1e-10:
+                depth_pathological = max(depth_pathological, 0.0)
+                attractor_ratio = depth_pathological / (depth_healthy + depth_pathological + 1e-10)
+            else:
+                attractor_ratio = 1.0
+            R_attractor = attractor_ratio
+        elif is_bistable and rv != float("inf"):
+            R_attractor = 1.0 - np.tanh(rv)
+
+        w_bistable = 0.35
+        w_critical = 0.35
+        w_attractor = 0.30
+
+        risk = w_bistable * R_bistable + w_critical * R_critical + w_attractor * R_attractor
+
+        risk = max(0.0, min(1.0, risk))
+        return float(risk)
+
+    def _classify_risk(self, score: float, tipping_warning: bool, dynamics: Dict = None) -> str:
         if tipping_warning:
             return "critical"
+
+        if dynamics is not None:
+            rv = dynamics.get("resilience_reserve", float("inf"))
+            cd = dynamics.get("critical_distance", 1.0)
+            is_bistable = dynamics.get("attractor_states", {}).get("is_bistable", False)
+
+            if is_bistable and rv < 0.1 and cd < 0.15:
+                return "critical"
+            if is_bistable and rv < 0.3:
+                return "high"
+            if is_bistable and score >= 0.4:
+                return "high"
+
         if score >= 0.7:
             return "high"
         if score >= 0.4:
