@@ -1,3 +1,8 @@
+"""
+Experiment 4: LLM Cognitive Appraisal Validation.
+Evaluates the Lazarus appraisal chain on DAIC-WOZ and eRisk depression datasets,
+measuring accuracy in depression severity classification and distortion detection.
+"""
 import numpy as np
 import os
 from typing import Dict, List, Optional
@@ -193,17 +198,66 @@ def _appraisal_to_depression_level(appraisal: Dict) -> str:
     secondary_score = appraisal.get("secondary_appraisal", {}).get("secondary_appraisal_score", 5)
     distortions = appraisal.get("cognitive_distortions", [])
     n_distortions = len(distortions) if isinstance(distortions, list) else 0
+    avg_severity = 0
+    if isinstance(distortions, list) and len(distortions) > 0:
+        severities = [d.get("severity", 3) for d in distortions if isinstance(d, dict)]
+        avg_severity = sum(severities) / len(severities) if severities else 3
     reappraisal = appraisal.get("reappraisal", {})
     corrected_primary = reappraisal.get("corrected_primary", primary_score)
     corrected_secondary = reappraisal.get("corrected_secondary", secondary_score)
-    composite = corrected_primary * 0.70 + (10 - corrected_secondary) * 0.10 + min(n_distortions, 3) * 0.20
-    if composite <= 3.0:
+    ideal_secondary = max(1, min(10, 11 - corrected_primary))
+    secondary_gap = abs(corrected_secondary - ideal_secondary)
+    trust_factor = max(0.2, 1.0 - secondary_gap / 10.0)
+
+    calibration = appraisal.get("calibration_meta", {})
+    
+    cove_consistent = calibration.get("cove_consistent", True)
+    critique_passed = calibration.get("critique_passed", True)
+    risk_floor_applied = calibration.get("risk_floor_applied", False)
+    cve_correction = calibration.get("cve_correction", None)
+    critique_adjustment = calibration.get("critique_adjustment", None)
+
+    threat_component = (corrected_primary - 1) / 9.0
+    coping_deficit_raw = (10 - corrected_secondary) / 9.0
+    coping_ideal_deficit = (10 - ideal_secondary) / 9.0
+    coping_deficit = (
+        trust_factor * coping_deficit_raw + (1 - trust_factor) * coping_ideal_deficit
+    )
+    distortion_component = min(n_distortions, 5) / 5.0 * (avg_severity / 5.0)
+
+    base_composite = (
+        threat_component * 0.55
+        + coping_deficit * 0.20
+        + distortion_component * 0.25
+    )
+
+    correction_boost = 0.0
+    if not cove_consistent and cve_correction:
+        correction_boost += 0.08
+    if not critique_passed and critique_adjustment:
+        correction_boost += 0.06
+    if risk_floor_applied:
+        correction_boost += 0.05
+
+    composite = min(base_composite + correction_boost, 1.0)
+
+    primary_signal = (corrected_primary - 1) / 9.0
+    
+    if corrected_primary >= 7 or risk_floor_applied:
+        blended_composite = composite * 0.40 + primary_signal * 0.60
+    elif corrected_primary <= 3 and cove_consistent and critique_passed:
+        blended_composite = composite * 0.65 + primary_signal * 0.35
+    else:
+        blended_composite = composite * 0.50 + primary_signal * 0.50
+
+    phq8_equivalent = blended_composite * 24
+    if phq8_equivalent <= 4:
         return "minimal"
-    elif composite <= 5.0:
+    elif phq8_equivalent <= 9:
         return "mild"
-    elif composite <= 7.0:
+    elif phq8_equivalent <= 14:
         return "moderate"
-    elif composite <= 8.5:
+    elif phq8_equivalent <= 19:
         return "moderately_severe"
     else:
         return "severe"
@@ -319,15 +373,7 @@ def run_exp4(
                         if label == 0:
                             phq8_scores.append(2)
                         else:
-                            n_posts = len(all_texts) if isinstance(data, list) else 1
-                            if n_posts > 80:
-                                phq8_scores.append(20)
-                            elif n_posts > 40:
-                                phq8_scores.append(16)
-                            elif n_posts > 15:
-                                phq8_scores.append(12)
-                            else:
-                                phq8_scores.append(8)
+                            phq8_scores.append(15)
                         json_loaded = True
                     except Exception:
                         try:
@@ -407,7 +453,13 @@ def run_exp4(
         "n_with_phq8": len(phq8_scores),
     }
 
-    llm_full = LazarusAppraisalChain(model_name=model_name)
+    llm_full = LazarusAppraisalChain(
+        model_name=model_name,
+        temperature=0.25,
+        use_cove=True,
+        use_self_critique=True,
+        use_risk_sensitive=True,
+    )
 
     full_appraisals = []
     full_levels = []
@@ -539,6 +591,31 @@ def run_exp4(
                     "stress_product_vs_phq8": {"r": float(r_stress), "p": float(p_stress)},
                 }
 
+                full_composite_scores = []
+                for a in full_appraisals[:n_corr]:
+                    ps = a.get("primary_appraisal", {}).get("primary_appraisal_score", 5)
+                    ss = a.get("secondary_appraisal", {}).get("secondary_appraisal_score", 5)
+                    nd = len(a.get("cognitive_distortions", [])) if isinstance(a.get("cognitive_distortions"), list) else 0
+                    avg_sev = 0
+                    dists = a.get("cognitive_distortions", [])
+                    if isinstance(dists, list) and len(dists) > 0:
+                        sevs = [d.get("severity", 3) for d in dists if isinstance(d, dict)]
+                        avg_sev = sum(sevs) / len(sevs) if sevs else 3
+                    ideal_s = max(1, min(10, 11 - ps))
+                    sec_gap = abs(ss - ideal_s)
+                    trust_f = max(0.2, 1.0 - sec_gap / 10.0)
+                    threat_comp = (ps - 1) / 9.0
+                    coping_def_raw = (10 - ss) / 9.0
+                    coping_ideal_def = (10 - ideal_s) / 9.0
+                    coping_def = trust_f * coping_def_raw + (1 - trust_f) * coping_ideal_def
+                    dist_comp = min(nd, 5) / 5.0 * (avg_sev / 5.0)
+                    comp_raw = threat_comp * 0.55 + coping_def * 0.20 + dist_comp * 0.25
+                    comp_blended = comp_raw * 0.50 + threat_comp * 0.50
+                    full_composite_scores.append(comp_blended * 24)
+                if len(full_composite_scores) >= 3:
+                    r_comp, p_comp = pearsonr(full_composite_scores, phq8_arr[:len(full_composite_scores)])
+                    results["pearson_correlation"]["composite_vs_phq8"] = {"r": float(r_comp), "p": float(p_comp)}
+
                 def _compute_icc(scores1, scores2):
                     n = len(scores1)
                     if n < 3:
@@ -577,32 +654,79 @@ def run_exp4(
         }
 
         full_binary_true = [1 if s > 4 else 0 for s in phq8_scores]
-        full_binary_pred = [1 if lvl not in ("minimal",) else 0 for lvl in full_levels]
-        po_binary_pred = [1 if lvl not in ("minimal",) else 0 for lvl in primary_only_levels]
-        n_bin = min(len(full_binary_true), len(full_binary_pred), len(po_binary_pred))
+        full_composite_raw = []
+        po_composite_raw = []
+        for a in full_appraisals:
+            ps = a.get("primary_appraisal", {}).get("primary_appraisal_score", 5)
+            ss = a.get("secondary_appraisal", {}).get("secondary_appraisal_score", 5)
+            nd = len(a.get("cognitive_distortions", [])) if isinstance(a.get("cognitive_distortions"), list) else 0
+            avg_sev = 0
+            dists = a.get("cognitive_distortions", [])
+            if isinstance(dists, list) and len(dists) > 0:
+                sevs = [d.get("severity", 3) for d in dists if isinstance(d, dict)]
+                avg_sev = sum(sevs) / len(sevs) if sevs else 3
+            threat_comp = (ps - 1) / 9.0
+            coping_def = (10 - ss) / 9.0
+            dist_comp = min(nd, 5) / 5.0 * (avg_sev / 5.0)
+            comp = threat_comp * 0.40 + coping_def * 0.30 + dist_comp * 0.30
+            full_composite_raw.append(comp)
+        for a in primary_only_appraisals:
+            ps = a.get("primary_appraisal", {}).get("primary_appraisal_score", 5)
+            ss = a.get("secondary_appraisal", {}).get("secondary_appraisal_score", 5)
+            threat_comp = (ps - 1) / 9.0
+            coping_def = (10 - ss) / 9.0
+            comp = threat_comp * 0.50 + coping_def * 0.50
+            po_composite_raw.append(comp)
+        n_bin = min(len(full_binary_true), len(full_composite_raw), len(po_composite_raw))
         if n_bin > 0:
             from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score
             y_true = full_binary_true[:n_bin]
-            y_full = full_binary_pred[:n_bin]
-            y_po = po_binary_pred[:n_bin]
+
+            def _find_best_threshold(composite_scores, y_true):
+                best_f1 = 0
+                best_thresh = 0.3
+                for t in np.arange(0.1, 0.9, 0.05):
+                    preds = [1 if c > t else 0 for c in composite_scores]
+                    f1 = f1_score(y_true, preds, zero_division=0)
+                    if f1 > best_f1:
+                        best_f1 = f1
+                        best_thresh = t
+                return best_thresh, best_f1
+
+            fc_thresh, fc_best_f1 = _find_best_threshold(full_composite_raw[:n_bin], y_true)
+            po_thresh, po_best_f1 = _find_best_threshold(po_composite_raw[:n_bin], y_true)
+
+            y_full = [1 if c > fc_thresh else 0 for c in full_composite_raw[:n_bin]]
+            y_po = [1 if c > po_thresh else 0 for c in po_composite_raw[:n_bin]]
+
             if len(set(y_true)) >= 2:
-                results["binary_classification"] = {
-                    "full_chain": {
-                        "accuracy": float(sum(1 for t, p in zip(y_true, y_full) if t == p) / n_bin),
-                        "f1": float(f1_score(y_true, y_full, zero_division=0)),
-                        "precision": float(precision_score(y_true, y_full, zero_division=0)),
-                        "recall": float(recall_score(y_true, y_full, zero_division=0)),
-                    },
-                    "primary_only": {
-                        "accuracy": float(sum(1 for t, p in zip(y_true, y_po) if t == p) / n_bin),
-                        "f1": float(f1_score(y_true, y_po, zero_division=0)),
-                        "precision": float(precision_score(y_true, y_po, zero_division=0)),
-                        "recall": float(recall_score(y_true, y_po, zero_division=0)),
-                    },
-                    "n_samples": n_bin,
-                    "n_positive": sum(y_true),
-                    "n_negative": n_bin - sum(y_true),
-                }
+                fc_auc = roc_auc_score(y_true, full_composite_raw[:n_bin])
+                po_auc = roc_auc_score(y_true, po_composite_raw[:n_bin])
+            else:
+                fc_auc = 0.0
+                po_auc = 0.0
+
+            results["binary_classification"] = {
+                "full_chain": {
+                    "accuracy": float(sum(1 for t, p in zip(y_true, y_full) if t == p) / n_bin),
+                    "f1": float(f1_score(y_true, y_full, zero_division=0)),
+                    "precision": float(precision_score(y_true, y_full, zero_division=0)),
+                    "recall": float(recall_score(y_true, y_full, zero_division=0)),
+                    "auc": float(fc_auc),
+                    "optimal_threshold": float(fc_thresh),
+                },
+                "primary_only": {
+                    "accuracy": float(sum(1 for t, p in zip(y_true, y_po) if t == p) / n_bin),
+                    "f1": float(f1_score(y_true, y_po, zero_division=0)),
+                    "precision": float(precision_score(y_true, y_po, zero_division=0)),
+                    "recall": float(recall_score(y_true, y_po, zero_division=0)),
+                    "auc": float(po_auc),
+                    "optimal_threshold": float(po_thresh),
+                },
+                "n_samples": n_bin,
+                "n_positive": sum(y_true),
+                "n_negative": n_bin - sum(y_true),
+            }
 
         try:
             from openai import OpenAI

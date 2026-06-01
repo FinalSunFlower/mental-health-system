@@ -16,7 +16,7 @@ try:
         dataset="erisk",
         use_lazarus_constraints=True,
         n_reflection_steps=3,
-        max_samples=40,
+        max_samples=80,
         model_name=r"D:\Models\huggingface\Qwen3.5-2B",
     )
 
@@ -61,14 +61,20 @@ try:
         print("\n--- Binary Classification (Clinical vs Non-clinical) ---")
         fc_bin = bc["full_chain"]
         po_bin = bc["primary_only"]
-        print(f"  Full Chain:  acc={fc_bin['accuracy']:.4f} F1={fc_bin['f1']:.4f} prec={fc_bin['precision']:.4f} rec={fc_bin['recall']:.4f}")
-        print(f"  Primary Only: acc={po_bin['accuracy']:.4f} F1={po_bin['f1']:.4f} prec={po_bin['precision']:.4f} rec={po_bin['recall']:.4f}")
+        print(f"  Full Chain:  acc={fc_bin['accuracy']:.4f} F1={fc_bin['f1']:.4f} prec={fc_bin['precision']:.4f} rec={fc_bin['recall']:.4f} AUC={fc_bin.get('auc',0):.4f} thresh={fc_bin.get('optimal_threshold',0.3):.2f}")
+        print(f"  Primary Only: acc={po_bin['accuracy']:.4f} F1={po_bin['f1']:.4f} prec={po_bin['precision']:.4f} rec={po_bin['recall']:.4f} AUC={po_bin.get('auc',0):.4f} thresh={po_bin.get('optimal_threshold',0.3):.2f}")
         print(f"  N samples: {bc['n_samples']} (pos={bc['n_positive']}, neg={bc['n_negative']})")
 
     if "pearson_correlation" in results:
         pc = results["pearson_correlation"]
         print("\n--- Pearson Correlation ---")
         for key, val in pc.items():
+            print(f"  {key}: r={val['r']:.4f}, p={val['p']:.4f}")
+
+    if "composite_correlation" in results:
+        cc = results["composite_correlation"]
+        print("\n--- Composite Correlation ---")
+        for key, val in cc.items():
             print(f"  {key}: r={val['r']:.4f}, p={val['p']:.4f}")
 
     if "icc" in results:

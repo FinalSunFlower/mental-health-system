@@ -1,3 +1,9 @@
+"""
+Layer 1: Causal Discovery Module.
+Implements EBIC-Glasso for precision matrix estimation, Score-based DAG search,
+and theory-constrained causal orientation using psychological domain knowledge
+(Borsboom network theory, DSM-5, Sachs pathway).
+"""
 import os
 import numpy as np
 from typing import List, Dict, Tuple, Optional

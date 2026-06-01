@@ -1,3 +1,8 @@
+"""
+NOTEARS algorithm baseline for causal discovery.
+Continuous optimization approach to DAG learning using acyclicity constraints.
+Includes fallback implementation when official package is unavailable.
+"""
 import numpy as np
 from typing import Optional
 

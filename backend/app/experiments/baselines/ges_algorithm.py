@@ -1,3 +1,7 @@
+"""
+GES (Greedy Equivalence Search) algorithm baseline for causal discovery.
+Score-based method that searches over Markov equivalence classes using BIC score.
+"""
 import numpy as np
 
 

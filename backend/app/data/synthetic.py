@@ -1,3 +1,8 @@
+"""
+Synthetic data generation for CUSP model validation.
+Generates multivariate time series from coupled CUSP dynamics with configurable
+parameters, noise levels, and network structure.
+"""
 import numpy as np
 from typing import Tuple
 

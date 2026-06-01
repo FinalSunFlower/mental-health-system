@@ -1,3 +1,8 @@
+"""
+Statistical analysis utilities for experimental validation.
+Provides bootstrap confidence intervals, significance testing, multiple comparison
+corrections (Bonferroni, FDR), McNemar test, DeLong ROC test, and effect sizes.
+"""
 import numpy as np
 from typing import Dict, List
 from scipy import stats

@@ -1,3 +1,8 @@
+"""
+CUSPNet module initialization.
+Exports the three-layer architecture: causal discovery, CUSP dynamics, and LLM appraisal,
+along with the main CuspNetEngine orchestrator and utility functions.
+"""
 from .layer1_causal import CausalDiscoveryLayer, TheoryConstraintEngine
 from .layer2_dynamics import CuspDynamicsLayer, NormProvider, POPULATION_NORMS
 from .layer3_llm import LazarusAppraisalChain

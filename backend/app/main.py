@@ -1,3 +1,8 @@
+"""
+FastAPI application entry point.
+Defines REST API endpoints for student assessment, history retrieval,
+and visualization data generation with CORS middleware for frontend integration.
+"""
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
@@ -282,6 +287,6 @@ def get_simulation_data():
     }
 
 
-@app.get("/health")
+@app.get("/api/health")
 def health_check():
     return {"status": "ok", "model_version": "CuspNet-1.0"}

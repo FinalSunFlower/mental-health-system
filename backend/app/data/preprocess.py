@@ -1,3 +1,8 @@
+"""
+Data preprocessing utilities.
+Provides standardization, missing value handling for questionnaire data,
+and CUSP parameter extraction from student assessment scores.
+"""
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from typing import Dict, Tuple

@@ -1,3 +1,7 @@
+"""
+PC (Peter-Clark) algorithm baseline for causal discovery.
+Constraint-based method using conditional independence tests to learn DAG structure.
+"""
 import numpy as np
 from typing import Optional
 

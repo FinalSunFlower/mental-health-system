@@ -1,3 +1,9 @@
+"""
+Layer 2: CUSP Catastrophe Dynamics Module.
+Implements the cusp bifurcation model for mental health dynamics, including
+global parameter estimation, local parameter allocation, attractor analysis,
+resilience reserve computation, and state-dependent drift prediction.
+"""
 import numpy as np
 from typing import Dict, Optional
 from scipy.integrate import solve_ivp

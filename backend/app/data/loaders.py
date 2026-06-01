@@ -1,3 +1,8 @@
+"""
+Dataset loaders for benchmark and real-world mental health data.
+Supports Sachs protein pathway, NHANES depression questionnaire, DAIC-WOZ interviews,
+StudentLife EMA data, and Kossakowski ESM time series.
+"""
 import os
 import json
 import numpy as np

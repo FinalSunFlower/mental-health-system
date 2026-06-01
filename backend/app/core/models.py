@@ -1,3 +1,8 @@
+"""
+SQLAlchemy ORM models for database persistence.
+Defines User, Student, and CuspNetRecord tables for storing assessment history,
+student information, and system user credentials.
+"""
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import DeclarativeBase, relationship
 from datetime import datetime

@@ -1,3 +1,8 @@
+"""
+Machine learning baseline classifiers.
+Provides Random Forest and XGBoost implementations with standard evaluation metrics
+(AUC-ROC, accuracy, classification report) for comparison with CUSPNet.
+"""
 import numpy as np
 from typing import Dict
 

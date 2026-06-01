@@ -1,3 +1,8 @@
+"""
+Causal DAG visualization utilities.
+Generates node/edge data for frontend graph rendering with centrality-based sizing
+and bridge symptom highlighting.
+"""
 import numpy as np
 from typing import Dict, List, Optional
 

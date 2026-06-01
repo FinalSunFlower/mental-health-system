@@ -1,3 +1,8 @@
+"""
+Experiment 1: Causal Discovery Benchmark.
+Compares CUSPNet's theory-constrained causal discovery against PC, GES, NOTEARS
+on Sachs protein pathway and NHANES depression data with statistical validation.
+"""
 import os
 import numpy as np
 from typing import Dict, Optional, List

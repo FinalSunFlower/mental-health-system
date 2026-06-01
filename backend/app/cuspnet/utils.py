@@ -1,3 +1,8 @@
+"""
+Utility functions for CUSP catastrophe model computations.
+Includes sigmoid activation, cubic root solving, potential function evaluation,
+fixed point analysis, resilience reserve calculation, and feedback loop detection.
+"""
 import numpy as np
 from typing import List, Dict
 

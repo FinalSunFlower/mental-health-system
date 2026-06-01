@@ -1,3 +1,8 @@
+"""
+Experiment 5: End-to-End System Evaluation.
+Integrates all three layers for complete mental health assessment, comparing
+CUSPNet against traditional ML baselines (Random Forest, XGBoost) on combined features.
+"""
 import numpy as np
 from typing import Dict, List, Optional
 from app.cuspnet.layer1_causal import CausalDiscoveryLayer

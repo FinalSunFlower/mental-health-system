@@ -1,3 +1,7 @@
+"""
+Network centrality visualization utilities.
+Generates heatmap data for adjacency matrix visualization with centrality overlay.
+"""
 import numpy as np
 from typing import Dict, List, Optional
 

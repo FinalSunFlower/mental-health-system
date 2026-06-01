@@ -1,3 +1,8 @@
+"""
+Experiment 2: CUSP Model Fitting Validation.
+Compares linear, logistic, and CUSP catastrophe models on StudentLife EMA data
+using sliding window analysis with AIC/BIC model selection.
+"""
 import numpy as np
 import pandas as pd
 import os

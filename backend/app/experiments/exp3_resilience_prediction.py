@@ -1,3 +1,8 @@
+"""
+Experiment 3: Resilience Reserve Prediction.
+Validates the CUSP resilience reserve (delta-V) as an early warning signal
+for mental health deterioration using StudentLife EMA data with tipping point detection.
+"""
 import os
 import numpy as np
 from typing import Dict, List, Optional

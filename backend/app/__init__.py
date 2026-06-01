@@ -1,3 +1,8 @@
+"""
+CuspNet Mental Health Assessment System - Main application package.
+Exports all core components: configuration, models, CUSPNet engine, data loaders,
+experimental pipelines, and visualization utilities.
+"""
 from .core import Settings, settings, engine, SessionLocal, get_db
 from .core import Base, User, Student, CuspNetRecord
 from .core import RiskLevel, CuspNetAssessmentRequest, CausalNetworkResult, DynamicsResult, LLMAppraisalResult, CuspNetAssessmentResponse, StudentBrief

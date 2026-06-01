@@ -1,3 +1,8 @@
+"""
+Database connection and session management.
+Provides SQLAlchemy engine, session factory, and FastAPI dependency injection
+for database sessions with proper cleanup.
+"""
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings

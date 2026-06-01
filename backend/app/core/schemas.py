@@ -1,3 +1,8 @@
+"""
+Pydantic schemas for API request/response validation.
+Defines data models for risk classification, causal network results,
+CUSP dynamics analysis, LLM appraisal outputs, and complete assessment responses.
+"""
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime

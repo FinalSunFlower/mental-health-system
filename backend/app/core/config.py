@@ -1,3 +1,8 @@
+"""
+Application configuration module.
+Defines global settings for database, LLM, and CUSP model hyperparameters
+using Pydantic BaseSettings with environment variable support and validation.
+"""
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 

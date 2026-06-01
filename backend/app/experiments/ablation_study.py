@@ -1,3 +1,8 @@
+"""
+Ablation Study: Component Contribution Analysis.
+Systematically removes CUSPNet components (theory constraints, CUSP dynamics,
+LLM appraisal) to quantify their individual contributions to performance.
+"""
 import numpy as np
 from typing import Dict, List, Optional
 from app.cuspnet.layer1_causal import CausalDiscoveryLayer

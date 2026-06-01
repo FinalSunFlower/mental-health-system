@@ -1,3 +1,8 @@
+"""
+CUSPNet Engine - Main orchestrator for the three-layer mental health assessment system.
+Integrates causal discovery (Layer 1), CUSP catastrophe dynamics (Layer 2), and
+Lazarus LLM appraisal (Layer 3) with parameter fusion and risk classification.
+"""
 import numpy as np
 from typing import Dict, Optional, List
 from .layer1_causal import CausalDiscoveryLayer, TheoryConstraintEngine

@@ -1,6 +1,14 @@
+"""
+Layer 3: Lazarus Cognitive Appraisal Chain with LLM.
+Implements the Lazarus transactional stress theory with primary appraisal,
+secondary appraisal, reappraisal, cognitive distortion detection, and
+CUSP parameter proxy extraction. Includes CoVe verification and self-critique.
+"""
 import json
 import re
-from typing import Dict, List, Optional, Any
+import copy
+from typing import Dict, List, Optional, Any, Tuple
+from collections import Counter
 
 
 DISTORTION_TYPES = [
@@ -29,6 +37,21 @@ SECONDARY_DEFAULT = {
 
 DISTORTION_DEFAULT = []
 
+RISK_KEYWORDS_HIGH = {
+    "suicid": 3, "kill myself": 3, "end it all": 3, "want to die": 3,
+    "hopeless": 2, "worthless": 2, "better off dead": 2, "can't go on": 2,
+    "no reason to live": 2, "ending my life": 2,
+    "depressed every day": 2, "can't get out of bed": 2,
+    "nothing matters": 1.5, "completely alone": 1.5, "no future": 1.5,
+}
+
+RISK_KEYWORDS_MODERATE = {
+    "can't sleep": 1.5, "insomnia": 1.5, "no appetite": 1.5,
+    "crying every day": 1.5, "always sad": 1.5, "exhausted all the time": 1.5,
+    "can't focus": 1, "don't enjoy anything": 1, "feel empty": 1,
+    "overwhelmed": 1, "anxious all the time": 1, "panic": 1,
+}
+
 
 class LazarusAppraisalChain:
     def __init__(
@@ -36,14 +59,26 @@ class LazarusAppraisalChain:
         model_name: str = r"D:\Models\huggingface\Qwen3.5-2B",
         device: str = "cuda",
         load_in_4bit: bool = True,
-        max_new_tokens: int = 512,
-        temperature: float = 0.3,
+        max_new_tokens: int = 768,
+        temperature: float = 0.25,
+        use_cove: bool = True,
+        use_self_critique: bool = True,
+        use_risk_sensitive: bool = True,
+        n_verification_questions: int = 3,
+        max_critique_rounds: int = 2,
+        risk_floor: float = 0.15,
     ):
         self.model_name = model_name
         self.device = device
         self.load_in_4bit = load_in_4bit
         self.max_new_tokens = max_new_tokens
-        self.temperature = 0.1
+        self.temperature = temperature
+        self.use_cove = use_cove
+        self.use_self_critique = use_self_critique
+        self.use_risk_sensitive = use_risk_sensitive
+        self.n_verification_questions = n_verification_questions
+        self.max_critique_rounds = max_critique_rounds
+        self.risk_floor = risk_floor
         self.tokenizer = None
         self.model = None
         self._warmed_up = False
@@ -102,10 +137,11 @@ class LazarusAppraisalChain:
         except Exception:
             self._warmed_up = True
 
-    def _generate(self, prompt: str) -> str:
+    def _generate(self, prompt: str, temperature: float = None) -> str:
         self._ensure_model()
         import torch
 
+        temp = temperature if temperature is not None else self.temperature
         try:
             messages = [{"role": "user", "content": prompt}]
             text = self.tokenizer.apply_chat_template(
@@ -118,9 +154,9 @@ class LazarusAppraisalChain:
                 outputs = self.model.generate(
                     **inputs,
                     max_new_tokens=self.max_new_tokens,
-                    temperature=self.temperature if self.temperature > 0 else 1e-5,
-                    do_sample=self.temperature > 0,
-                    top_p=0.9,
+                    temperature=max(temp, 1e-5) if temp > 0 else 1e-5,
+                    do_sample=temp > 0,
+                    top_p=0.92,
                     pad_token_id=self.tokenizer.pad_token_id,
                 )
             generated_ids = outputs[0][input_len:]
@@ -128,10 +164,7 @@ class LazarusAppraisalChain:
             return raw
         except UnicodeDecodeError:
             try:
-                raw_bytes = self.tokenizer.decode(
-                    generated_ids, skip_special_tokens=True
-                )
-                return raw_bytes.encode("utf-8", errors="replace").decode("utf-8")
+                return self.tokenizer.decode(generated_ids, skip_special_tokens=True).encode("utf-8", errors="replace").decode("utf-8")
             except Exception:
                 return ""
         except Exception:
@@ -143,17 +176,13 @@ class LazarusAppraisalChain:
             end = text.rfind("}") + 1
             if start >= 0 and end > start:
                 candidate = text[start:end]
-                candidate = re.sub(r",\s*}", "}", candidate)
-                candidate = re.sub(r",\s*]", "]", candidate)
-                candidate = re.sub(
-                    r'"\s*:\s*None', '": null', candidate
-                )
-                candidate = re.sub(
-                    r'"\s*:\s*True', '": true', candidate
-                )
-                candidate = re.sub(
-                    r'"\s*:\s*False', '": false', candidate
-                )
+                for pattern, replacement in [
+                    (r",\s*}", "}"), (r",\s*]", "]"),
+                    (r'"\s*:\s*None', '": null'),
+                    (r'"\s*:\s*True', '": true'),
+                    (r'"\s*:\s*False', '": false'),
+                ]:
+                    candidate = re.sub(pattern, replacement, candidate)
                 return json.loads(candidate)
         except json.JSONDecodeError:
             pass
@@ -170,109 +199,207 @@ class LazarusAppraisalChain:
         total_chars = len(text.strip())
         if total_chars == 0:
             return "en"
-        ratio = chinese_chars / total_chars
-        return "zh" if ratio > 0.15 else "en"
+        return "zh" if chinese_chars / total_chars > 0.15 else "en"
 
-    def full_chain(
-        self,
-        text: str,
-        causal_info: Optional[Dict] = None,
-        dynamics_info: Optional[Dict] = None,
-    ) -> Dict[str, Any]:
-        text = text[:3000]
-        primary = self.primary_appraisal(text)
-        secondary = self.secondary_appraisal(text, primary)
-        secondary = self._enforce_primary_secondary_consistency(primary, secondary)
-        reappraisal_result = self.reappraisal(primary, secondary, text)
-        cp = reappraisal_result.get("corrected_primary", primary.get("primary_appraisal_score", 5))
-        cs = reappraisal_result.get("corrected_secondary", secondary.get("secondary_appraisal_score", 5))
-        distortions = self.detect_distortions(text, cp, cs)
-        try:
-            integration = self.integrate(
-                primary, secondary, reappraisal_result, distortions, causal_info, dynamics_info
-            )
-        except Exception as e:
-            p_val = reappraisal_result.get("corrected_primary", primary.get("primary_appraisal_score", 5))
-            s_val = reappraisal_result.get("corrected_secondary", secondary.get("secondary_appraisal_score", 5))
-            social = secondary.get("social_support_perceived", 5)
-            n_dist = len(distortions)
-            integration = {
-                "cusp_proxies": {
-                    "a_proxy": (p_val - s_val) / 10.0,
-                    "b_proxy": (s_val * social) / 100.0 - 0.5,
-                    "c_proxy": social * (11 - n_dist) / 100.0,
-                },
-                "explanation": f"Integration fallback (error: {e})",
-                "intervention": "Based on appraisal scores, consider professional consultation.",
-            }
-        return {
-            "primary_appraisal": primary,
-            "secondary_appraisal": secondary,
-            "reappraisal": reappraisal_result,
-            "cognitive_distortions": distortions,
-            "cusp_proxies": integration["cusp_proxies"],
-            "explanation": integration["explanation"],
-            "intervention": integration["intervention"],
-        }
+    def _scan_risk_keywords(self, text: str) -> Tuple[float, List[str]]:
+        text_lower = text.lower()
+        total_score = 0.0
+        found_keywords = []
+        for keyword, weight in RISK_KEYWORDS_HIGH.items():
+            if keyword in text_lower:
+                total_score += weight
+                found_keywords.append(f"HIGH:{keyword}({weight})")
+        for keyword, weight in RISK_KEYWORDS_MODERATE.items():
+            if keyword in text_lower:
+                total_score += weight
+                found_keywords.append(f"MOD:{keyword}({weight})")
+        return min(total_score / 10.0, 1.0), found_keywords
 
     def primary_appraisal(self, text: str) -> Dict:
         lang = self._detect_language(text)
+        
+        draft = self._primary_draft_generation(text, lang)
+        
+        if self.use_cove:
+            verified = self._cove_verify(draft, text, lang)
+            result = verified
+        else:
+            result = draft
+        
+        if self.use_self_critique:
+            critiqued = self._self_critique_primary(result, text, lang)
+            result = critiqued
+        
+        if self.use_risk_sensitive:
+            result = self._apply_risk_floor(result, text)
+        
+        return self._validate_primary(result)
+
+    def _primary_draft_generation(self, text: str, lang: str) -> Dict:
         if lang == "zh":
             prompt = (
-                "你是一名临床心理学家，正在执行Lazarus初级评估（Primary Appraisal）。\n"
-                "你的任务是分析以下文本中的威胁识别。\n\n"
-                "请分析文本并识别：\n"
-                "1. 是否识别到威胁（true/false）\n"
-                "2. 威胁类型（如：身体威胁、心理威胁、社会威胁、存在性威胁）\n"
-                "3. 威胁强度，1-10分（1=极低，10=极高）\n"
-                "4. 简短叙述描述感知到的威胁\n"
-                "5. 初级评估得分，1-10分（1=无威胁，10=严重威胁）\n\n"
-                "仅以以下JSON格式回复：\n"
-                "{\n"
-                '  "threat_identified": true,\n'
-                '  "threat_type": "string",\n'
-                '  "threat_intensity": number,\n'
-                '  "threat_narrative": "string",\n'
-                '  "primary_appraisal_score": number\n'
-                "}\n\n"
-                "待分析文本：\n"
-                f"{text}\n\n"
-                "JSON回复："
+                "你是资深临床心理学家，执行Lazarus初级评估。\n\n"
+                "【评估目标】判断文本反映的心理健康威胁等级(1-10)\n\n"
+                "【评分锚点】\n"
+                "- 1-3: 无临床威胁。日常抱怨、正常情绪波动\n"
+                "- 4-5: 轻度压力。有担忧但功能正常\n"
+                "- 6-7: 中度关注。持续困扰、部分功能受损\n"
+                "- 8-10: 严重危机。自杀意念、严重功能障碍\n\n"
+                "【关键症状指标】\n"
+                "自杀/死亡相关表述 → 至少7分\n"
+                "持续2周以上的情绪低落+躯体症状 → 至少6分\n"
+                "偶发负面情绪但社会功能正常 → 最多4分\n\n"
+                "JSON格式:\n"
+                '{threat_identified:bool, threat_type:str, threat_intensity:int(1-10), '
+                'threat_narrative:str, primary_appraisal_score:int(1-10)}\n\n'
+                f"文本:\n{text}\n\nJSON:"
             )
         else:
             prompt = (
-                "You are a clinical psychologist performing a Lazarus Primary Appraisal for mental health screening. "
-                "Your task is to evaluate the following text for clinical-level threat to mental wellbeing.\n\n"
-                "IMPORTANT DISTINCTIONS:\n"
-                "- Score 1-3: No clinical threat. Normal life stress, everyday complaints, casual mentions of mood, "
-                "or general life updates that do NOT indicate psychological distress.\n"
-                "- Score 4-5: Mild stress. Some concern but within normal range; the person is coping adequately.\n"
-                "- Score 6-7: Moderate clinical concern. Clear signs of psychological distress such as persistent "
-                "sadness, anxiety, or difficulty functioning.\n"
-                "- Score 8-10: Severe clinical threat. Indicators of major depression, suicidal ideation, "
-                "hopelessness, or severe psychological crisis.\n\n"
-                "Be CONSERVATIVE: only assign high scores (6+) when there is clear evidence of clinical-level "
-                "distress. Do NOT over-interpret casual negativity, humor, or minor frustrations.\n\n"
-                "Analyze the text and identify:\n"
-                "1. Whether a clinical threat is identified (true/false)\n"
-                "2. The type of threat (e.g., physical, psychological, social, existential, none)\n"
-                "3. Threat intensity on a scale of 1-10 (1=minimal, 10=extreme)\n"
-                "4. A brief narrative describing the perceived threat\n"
-                "5. Primary appraisal score on a scale of 1-10 (1=no clinical threat, 10=severe clinical threat)\n\n"
-                "Respond ONLY with a JSON object in this exact format:\n"
-                "{\n"
-                '  "threat_identified": true,\n'
-                '  "threat_type": "string",\n'
-                '  "threat_intensity": number,\n'
-                '  "threat_narrative": "string",\n'
-                '  "primary_appraisal_score": number\n'
-                "}\n\n"
-                "Text to analyze:\n"
-                f"{text}\n\n"
-                "JSON response:"
+                "You are a senior clinical psychologist performing Primary Appraisal.\n\n"
+                "TASK: Assess mental health threat level (1-10) from text.\n\n"
+                "SCORE ANCHORS:\n"
+                "- 1-3: No clinical threat. Daily complaints, normal mood swings.\n"
+                "- 4-5: Mild stress. Concerns present but functioning normally.\n"
+                "- 6-7: Moderate concern. Persistent distress, some functional impairment.\n"
+                "- 8-10: Severe crisis. Suicidal ideation, severe dysfunction.\n\n"
+                "CRITICAL INDICATORS (must elevate score):\n"
+                "- Any suicidal/death-related language → minimum score 7\n"
+                "- Persistent (>2 weeks) low mood + somatic symptoms → minimum score 6\n"
+                "- Occasional negativity with intact function → maximum score 4\n\n"
+                "Respond with JSON only:\n"
+                '{threat_identified:bool, threat_type:str, threat_intensity:int(1-10), '
+                'threat_narrative:str, primary_appraisal_score:int(1-10)}\n\n'
+                f"Text:\n{text}\n\nJSON:"
             )
+
         raw = self._generate(prompt)
         parsed = self._parse_json(raw, PRIMARY_DEFAULT.copy())
+        parsed["_draft_raw"] = raw[:300]
+        return parsed
+
+    def _cove_verify(self, draft: Dict, text: str, lang: str) -> Dict:
+        draft_score = draft.get("primary_appraisal_score", 5)
+        draft_narrative = draft.get("threat_narrative", "")
+        draft_threat = draft.get("threat_identified", False)
+
+        if lang == "zh":
+            verify_prompt = (
+                "【CoVe验证阶段】检查初级评估结果是否与文本证据一致。\n\n"
+                f"原始评分: {draft_score}/10\n"
+                f"威胁识别: {draft_threat}\n"
+                f"叙述: {draft_narrative}\n\n"
+                f"原文:\n{text[:1500]}\n\n"
+                "请回答以下验证问题(Y/N+理由):\n"
+                f"Q1: 文本是否包含自杀/自伤/死亡相关表述？如果有，{draft_score}分是否合理？\n"
+                f"Q2: 文本是否描述持续的情绪低落或功能障碍？如果有，{draft_score}分是否合理？\n"
+                f"Q3: 如果评分为{draft_score}，是否意味着'无临床威胁'(≤3)或'轻度'(≤5)？这与文本内容矛盾吗？\n\n"
+                "最终结论(JSON):\n"
+                "{is_consistent:bool, verified_score:int, discrepancy:str, correction_needed:bool}"
+            )
+        else:
+            verify_prompt = (
+                "[CoVe Verification] Check if assessment is consistent with textual evidence.\n\n"
+                f"Draft score: {draft_score}/10\n"
+                f"Threat identified: {draft_threat}\n"
+                f"Narrative: {draft_narrative}\n\n"
+                f"Original text:\n{text[:1500]}\n\n"
+                "Answer these verification questions (Y/N + reasoning):\n"
+                f"Q1: Does text contain suicide/self-harm/death language? If yes, is score={draft_score} justified?\n"
+                f"Q2: Does text describe persistent low mood or dysfunction? If yes, is score={draft_score} justified?\n"
+                f"Q3: Score={draft_score} implies {'NO clinical threat' if draft_score <= 3 else 'mild' if draft_score <= 5 else 'moderate-severe'}. "
+                f"Does this contradict the text?\n\n"
+                "Final verdict (JSON):\n"
+                "{is_consistent:bool, verified_score:int, discrepancy:str, correction_needed:bool}"
+            )
+
+        raw_verify = self._generate(verify_prompt)
+        verify_result = self._parse_json(raw_verify, {"is_consistent": True, "verified_score": draft_score, "discrepancy": "", "correction_needed": False})
+
+        corrected = copy.deepcopy(draft)
+        corrected["_cove_verified"] = True
+        corrected["_cove_consistent"] = verify_result.get("is_consistent", True)
+        corrected["_cove_discrepancy"] = verify_result.get("discrepancy", "")
+
+        if verify_result.get("correction_needed", False):
+            new_score = verify_result.get("verified_score", draft_score)
+            if isinstance(new_score, (int, float)):
+                corrected["primary_appraisal_score"] = max(1, min(10, int(new_score)))
+                corrected["_cve_correction"] = f"{draft_score}->{corrected['primary_appraisal_score']}"
+
+        return corrected
+
+    def _self_critique_primary(self, result: Dict, text: str, lang: str) -> Dict:
+        current_score = result.get("primary_appraisal_score", 5)
+        risk_score, risk_keywords = self._scan_risk_keywords(text)
+
+        if lang == "zh":
+            critique_prompt = (
+                "【Self-Critique 自我批判】审查自身评估的合理性。\n\n"
+                f"当前评分: {current_score}/10\n"
+                f"文本风险关键词扫描: 发现 {len(risk_keywords)} 个风险信号\n"
+                f"风险关键词: {risk_keywords[:5] if risk_keywords else '无'}\n"
+                f"综合风险值: {risk_score:.2f}/1.0\n\n"
+                "批判规则:\n"
+                "R1: 若文本含高风险词(自杀/绝望)但评分≤5 → 必须提升评分\n"
+                "R2: 若文本含中等风险词(失眠/持续悲伤)且评分≤3 → 应提升至至少5\n"
+                "R3: 若评分≥8但文本无明显风险词 → 确认是否有充分依据\n"
+                "R4: 评分应与风险关键词密度大致正相关\n\n"
+                "输出(JSON):\n"
+                "{critique_passed:bool, issues:list, adjusted_score:int|null, confidence:float}"
+            )
+        else:
+            critique_prompt = (
+                "[Self-Critique] Scrutinize own assessment for consistency.\n\n"
+                f"Current score: {current_score}/10\n"
+                f"Risk keyword scan: {len(risk_keywords)} signals found\n"
+                f"Keywords: {risk_keywords[:5] if risk_keywords else 'none'}\n"
+                f"Aggregate risk: {risk_score:.2f}/1.0\n\n"
+                "Critique rules:\n"
+                "R1: High-risk words (suicide/hopeless) present but score ≤5 → MUST increase\n"
+                "R2: Moderate-risk words (insomnia/persistent sadness) present but score ≤3 → should be ≥5\n"
+                "R3: Score ≥8 but no clear risk words → verify strong justification exists\n"
+                "R4: Score should correlate with risk keyword density\n\n"
+                "Output (JSON):\n"
+                "{critique_passed:bool, issues:list, adjusted_score:int|null, confidence:float}"
+            )
+
+        raw_critique = self._generate(critique_prompt)
+        critique_result = self._parse_json(raw_critique, {"critique_passed": True, "issues": [], "adjusted_score": None, "confidence": 0.8})
+
+        corrected = copy.deepcopy(result)
+        corrected["_critiqued"] = True
+        corrected["_critique_issues"] = critique_result.get("issues", [])
+        corrected["_critique_confidence"] = critique_result.get("confidence", 0.8)
+
+        adj_score = critique_result.get("adjusted_score")
+        if adj_score is not None and isinstance(adj_score, (int, float)):
+            old = corrected.get("primary_appraisal_score", 5)
+            new = max(1, min(10, int(adj_score)))
+            corrected["primary_appraisal_score"] = new
+            corrected["_critique_adjustment"] = f"{old}->{new}"
+
+        return corrected
+
+    def _apply_risk_floor(self, result: Dict, text: str) -> Dict:
+        risk_score, keywords = self._scan_risk_keywords(text)
+        current = result.get("primary_appraisal_score", 5)
+
+        floor_score = max(3, round(risk_score * 9 + 1))
+
+        if current < floor_score and risk_score > 0.2:
+            old = current
+            result["primary_appraisal_score"] = max(current, floor_score)
+            result["_risk_floor_applied"] = True
+            result["_risk_floor"] = floor_score
+            result["_risk_keywords_found"] = [k.split("(")[0] for k in keywords]
+            result["_risk_adjustment"] = f"{old}->{result['primary_appraisal_score']}"
+        else:
+            result["_risk_floor_applied"] = False
+
+        return result
+
+    def _validate_primary(self, parsed: Dict) -> Dict:
         if not isinstance(parsed.get("threat_identified"), bool):
             parsed["threat_identified"] = False
         if not isinstance(parsed.get("threat_intensity"), (int, float)):
@@ -282,9 +409,7 @@ class LazarusAppraisalChain:
         if not isinstance(parsed.get("primary_appraisal_score"), (int, float)):
             parsed["primary_appraisal_score"] = 5
         else:
-            parsed["primary_appraisal_score"] = max(
-                1, min(10, int(parsed["primary_appraisal_score"]))
-            )
+            parsed["primary_appraisal_score"] = max(1, min(10, int(parsed["primary_appraisal_score"])))
         for key in PRIMARY_DEFAULT:
             if key not in parsed:
                 parsed[key] = PRIMARY_DEFAULT[key]
@@ -292,117 +417,87 @@ class LazarusAppraisalChain:
 
     def secondary_appraisal(self, text: str, primary: Dict) -> Dict:
         lang = self._detect_language(text)
+        p_score = primary.get("primary_appraisal_score", 5)
+        ideal_s = max(1, min(10, 11 - p_score))
+
         if lang == "zh":
             prompt = (
-                "你是一名临床心理学家，正在执行Lazarus次级评估（Secondary Appraisal）。\n"
-                "你的任务是基于以下文本和初级评估结果，评估应对资源和社会支持。\n\n"
-                "初级评估结果：\n"
-                f"- 是否识别到威胁：{primary.get('threat_identified', False)}\n"
-                f"- 威胁类型：{primary.get('threat_type', '未知')}\n"
-                f"- 威胁强度：{primary.get('threat_intensity', 5)}/10\n"
-                f"- 初级评估得分：{primary.get('primary_appraisal_score', 5)}/10\n\n"
-                "请分析文本并评估：\n"
-                "1. 可用的应对资源（具体资源列表）\n"
-                "2. 应对效能，1-10分（1=极低，10=极高）\n"
-                "3. 感知到的社会支持，1-10分（1=极低，10=极高）\n"
-                "4. 简短叙述描述可用资源\n"
-                "5. 次级评估得分，1-10分（1=无资源，10=资源丰富）\n\n"
-                "仅以以下JSON格式回复：\n"
-                "{\n"
-                '  "coping_resources": ["string"],\n'
-                '  "coping_efficacy": number,\n'
-                '  "social_support_perceived": number,\n'
-                '  "resource_narrative": "string",\n'
-                '  "secondary_appraisal_score": number\n'
-                "}\n\n"
-                "待分析文本：\n"
-                f"{text}\n\n"
-                "JSON回复："
+                "执行Lazarus次级评估——评估应对资源。\n\n"
+                f"初级评估得分: {p_score}/10 ({'高威胁' if p_score >= 6 else '低威胁' if p_score <= 4 else '中等'})\n\n"
+                "【逆关系约束】威胁越高→应对能力越低\n"
+                f"建议次级评分范围: [{max(1, ideal_s-2)}, {min(10, ideal_s+2)}]\n\n"
+                "评分标准:\n"
+                "- 1-3: 无应对资源，孤立无助\n"
+                "- 4-6: 有一些但不稳定\n"
+                "- 7-10: 有充足支持系统\n\n"
+                "JSON:\n"
+                '{coping_resources:list, coping_efficacy:int(1-10), '
+                'social_support_perceived:int(1-10), secondary_appraisal_score:int(1-10)}\n\n'
+                f"文本:\n{text}\n\nJSON:"
             )
         else:
             prompt = (
-                "You are a clinical psychologist performing a Lazarus Secondary Appraisal for mental health screening. "
-                "Your task is to evaluate coping resources and social support based on the following text "
-                "and the primary appraisal results.\n\n"
-                "IMPORTANT: Score based on EVIDENCE in the text, not assumptions.\n"
-                "- Score 8-10: Strong coping. Person explicitly describes effective strategies, "
-                "social connections, professional help, or resilience.\n"
-                "- Score 5-7: Moderate coping. Some resources mentioned but not comprehensive.\n"
-                "- Score 1-4: Low coping. Person describes helplessness, isolation, lack of support, "
-                "or inability to manage stress.\n\n"
-                "If the text does NOT indicate psychological distress (low primary threat), "
-                "assume the person has adequate coping unless evidence suggests otherwise.\n\n"
-                "Primary appraisal results:\n"
-                f"- Threat identified: {primary.get('threat_identified', False)}\n"
-                f"- Threat type: {primary.get('threat_type', 'unknown')}\n"
-                f"- Threat intensity: {primary.get('threat_intensity', 5)}/10\n"
-                f"- Primary appraisal score: {primary.get('primary_appraisal_score', 5)}/10\n\n"
-                "Analyze the text and assess:\n"
-                "1. Available coping resources (list of specific resources)\n"
-                "2. Coping efficacy on a scale of 1-10 (1=very low, 10=very high)\n"
-                "3. Perceived social support on a scale of 1-10 (1=very low, 10=very high)\n"
-                "4. A brief narrative describing available resources\n"
-                "5. Secondary appraisal score on a scale of 1-10 (1=no resources, 10=abundant resources)\n\n"
-                "Respond ONLY with a JSON object in this exact format:\n"
-                "{\n"
-                '  "coping_resources": ["string"],\n'
-                '  "coping_efficacy": number,\n'
-                '  "social_support_perceived": number,\n'
-                '  "resource_narrative": "string",\n'
-                '  "secondary_appraisal_score": number\n'
-                "}\n\n"
-                "Text to analyze:\n"
-                f"{text}\n\n"
-                "JSON response:"
+                "Perform Lazarus Secondary Appraisal — assess coping resources.\n\n"
+                f"Primary appraisal score: {p_score}/10 ({'HIGH threat' if p_score >= 6 else 'LOW threat' if p_score <= 4 else 'MODERATE'})\n\n"
+                "INVERSE CONSTRAINT: Higher threat → Lower coping ability\n"
+                f"Recommended secondary range: [{max(1, ideal_s-2)}, {min(10, ideal_s+2)}]\n\n"
+                "Scoring:\n"
+                "- 1-3: No resources, isolated, helpless\n"
+                "- 4-6: Some but unstable\n"
+                "- 7-10: Strong support system\n\n"
+                "JSON:\n"
+                '{coping_resources:list, coping_efficacy:int(1-10), '
+                'social_support_perceived:int(1-10), secondary_appraisal_score:int(1-10)}\n\n'
+                f"Text:\n{text}\n\nJSON:"
             )
+
         raw = self._generate(prompt)
         parsed = self._parse_json(raw, SECONDARY_DEFAULT.copy())
+        parsed = self._validate_secondary(parsed)
+        parsed = self._apply_inverse_constraint(primary, parsed)
+        return parsed
+
+    def _validate_secondary(self, parsed: Dict) -> Dict:
         if not isinstance(parsed.get("coping_resources"), list):
             parsed["coping_resources"] = []
-        if not isinstance(parsed.get("coping_efficacy"), (int, float)):
-            parsed["coping_efficacy"] = 5
-        else:
-            parsed["coping_efficacy"] = max(
-                1, min(10, int(parsed["coping_efficacy"]))
-            )
-        if not isinstance(parsed.get("social_support_perceived"), (int, float)):
-            parsed["social_support_perceived"] = 5
-        else:
-            parsed["social_support_perceived"] = max(
-                1, min(10, int(parsed["social_support_perceived"]))
-            )
-        if not isinstance(parsed.get("secondary_appraisal_score"), (int, float)):
-            parsed["secondary_appraisal_score"] = 5
-        else:
-            parsed["secondary_appraisal_score"] = max(
-                1, min(10, int(parsed["secondary_appraisal_score"]))
-            )
+        for key in ["coping_efficacy", "social_support_perceived", "secondary_appraisal_score"]:
+            val = parsed.get(key, 5)
+            if not isinstance(val, (int, float)):
+                val = 5
+            parsed[key] = max(1, min(10, int(val)))
         for key in SECONDARY_DEFAULT:
             if key not in parsed:
                 parsed[key] = SECONDARY_DEFAULT[key]
         return parsed
 
-    def _enforce_primary_secondary_consistency(
-        self, primary: Dict, secondary: Dict
-    ) -> Dict:
+    def _apply_inverse_constraint(self, primary: Dict, secondary: Dict) -> Dict:
         p_score = primary.get("primary_appraisal_score", 5)
         s_score = secondary.get("secondary_appraisal_score", 5)
-        if p_score <= 3 and s_score < 6:
-            secondary["secondary_appraisal_score"] = max(s_score, 7)
-            secondary["coping_efficacy"] = max(
-                secondary.get("coping_efficacy", 5), 6
-            )
-            secondary["social_support_perceived"] = max(
-                secondary.get("social_support_perceived", 5), 6
-            )
-        elif p_score >= 7 and s_score > 5:
-            secondary["secondary_appraisal_score"] = min(s_score, 4)
-            secondary["coping_efficacy"] = min(
-                secondary.get("coping_efficacy", 5), 5
-            )
-            secondary["social_support_perceived"] = min(
-                secondary.get("social_support_perceived", 5), 5
-            )
+        ideal_s = max(1, min(10, 11 - p_score))
+        deviation = s_score - ideal_s
+
+        if abs(deviation) > 2:
+            pull_strength = min(abs(deviation) * 0.18, 0.45)
+            corrected_s = s_score - deviation * pull_strength
+            secondary["secondary_appraisal_score"] = max(1, min(10, round(corrected_s)))
+            secondary["_inverse_corrected"] = True
+            secondary["_inverse_amount"] = round(deviation * pull_strength, 2)
+
+        return secondary
+
+    def _enforce_primary_secondary_consistency(self, primary: Dict, secondary: Dict) -> Dict:
+        p_score = primary.get("primary_appraisal_score", 5)
+        s_score = secondary.get("secondary_appraisal_score", 5)
+        ideal = max(1, min(10, 11 - p_score))
+        deviation = s_score - ideal
+
+        if abs(deviation) > 3:
+            blend = round(0.55 * ideal + 0.45 * s_score)
+            secondary["secondary_appraisal_score"] = max(1, min(10, blend))
+            if deviation > 0:
+                secondary["coping_efficacy"] = min(secondary.get("coping_efficacy", 5), max(1, blend - 1))
+            else:
+                secondary["coping_efficacy"] = max(secondary.get("coping_efficacy", 5), min(10, blend + 1))
         return secondary
 
     def reappraisal(self, primary: Dict, secondary: Dict, text: str) -> Dict:
@@ -412,369 +507,153 @@ class LazarusAppraisalChain:
 
         if lang == "zh":
             prompt = (
-                "你是一名临床心理学家，正在执行Lazarus重新评估（Reappraisal）。\n"
-                "你的任务是审视之前的初级和次级评估结果，判断是否存在认知偏差导致的过度评估或低估，"
-                "并给出校正后的分数。\n\n"
-                "初级评估结果：\n"
-                f"- 是否识别到威胁：{primary.get('threat_identified', False)}\n"
-                f"- 威胁类型：{primary.get('threat_type', '未知')}\n"
-                f"- 威胁强度：{primary.get('threat_intensity', 5)}/10\n"
-                f"- 初级评估得分：{p}/10\n\n"
-                "次级评估结果：\n"
-                f"- 应对效能：{secondary.get('coping_efficacy', 5)}/10\n"
-                f"- 感知社会支持：{secondary.get('social_support_perceived', 5)}/10\n"
-                f"- 次级评估得分：{s}/10\n\n"
-                "请重新审视评估结果，考虑以下可能性：\n"
-                "1. 威胁是否被高估（如灾难化思维导致威胁评分偏高）？\n"
-                "2. 应对资源是否被低估（如忽视已有支持系统）？\n"
-                "3. 威胁是否被低估（如否认机制导致忽视真实风险）？\n"
-                "4. 应对资源是否被高估（如不切实际的乐观）？\n\n"
-                "仅以以下JSON格式回复：\n"
-                "{\n"
-                '  "rollback_needed": true/false,\n'
-                '  "rollback_reason": "string",\n'
-                '  "corrected_primary": number,\n'
-                '  "corrected_secondary": number,\n'
-                '  "lazarus_consistency": true/false,\n'
-                '  "expected_stress": number\n'
-                "}\n\n"
-                "待重新评估的文本：\n"
-                f"{text}\n\n"
-                "JSON回复："
+                f"Lazarus重新评估。初级={p}/10, 次级={s}/10\n"
+                "一致性检查: 高威胁(p≥7)+高应对(s≥6)=异常 | 低威胁(p≤3)+低应对(s≤4)=异常\n"
+                "仅微调±1-2分，除非压倒性证据否则保持。\n"
+                "{rollback_needed:bool, rollback_reason:str, corrected_primary:int, corrected_secondary:int, "
+                "lazarus_consistency:bool, expected_stress:number}\n\n"
+                f"文本: {text}\n\nJSON:"
             )
         else:
             prompt = (
-                "You are a clinical psychologist performing a Lazarus Reappraisal. "
-                "Your task is to critically review the primary and secondary appraisal results, "
-                "identify potential cognitive biases that may have led to over- or under-estimation, "
-                "and provide SMALL corrected scores.\n\n"
-                "IMPORTANT: Make only MINOR adjustments (1-2 points max). "
-                "Do NOT drastically change scores unless there is overwhelming evidence. "
-                "If the initial appraisal seems reasonable, keep the corrected scores the same.\n\n"
-                "Primary appraisal results:\n"
-                f"- Threat identified: {primary.get('threat_identified', False)}\n"
-                f"- Threat type: {primary.get('threat_type', 'unknown')}\n"
-                f"- Threat intensity: {primary.get('threat_intensity', 5)}/10\n"
-                f"- Primary appraisal score: {p}/10\n\n"
-                "Secondary appraisal results:\n"
-                f"- Coping efficacy: {secondary.get('coping_efficacy', 5)}/10\n"
-                f"- Perceived social support: {secondary.get('social_support_perceived', 5)}/10\n"
-                f"- Secondary appraisal score: {s}/10\n\n"
-                "Please re-evaluate considering the following possibilities:\n"
-                "1. Is the threat overestimated (e.g., catastrophizing inflating threat scores)?\n"
-                "2. Are coping resources underestimated (e.g., overlooking existing support)?\n"
-                "3. Is the threat underestimated (e.g., denial mechanisms ignoring real risks)?\n"
-                "4. Are coping resources overestimated (e.g., unrealistic optimism)?\n\n"
-                "Respond ONLY with a JSON object:\n"
-                "{\n"
-                '  "rollback_needed": true/false,\n'
-                '  "rollback_reason": "string",\n'
-                '  "corrected_primary": number,\n'
-                '  "corrected_secondary": number,\n'
-                '  "lazarus_consistency": true/false,\n'
-                '  "expected_stress": number\n'
-                "}\n\n"
-                "Text to re-evaluate:\n"
-                f"{text}\n\n"
-                "JSON response:"
+                f"Lazarus Reappraisal. Primary={p}/10, Secondary={s}/10\n"
+                f"Consistency check: {'CONFLICT' if p >= 7 and s >= 6 else 'OK'} | "
+                f"{'CONFLICT' if p <= 3 and s <= 4 else 'OK'}\n"
+                "Minor adjustments only (±1-2 pts). Keep if reasonable.\n"
+                "{rollback_needed:bool, rollback_reason:str, corrected_primary:int, corrected_secondary:int, "
+                "lazarus_consistency:bool, expected_stress:number}\n\n"
+                f"Text: {text}\n\nJSON:"
             )
-
-        REAPPRAISAL_DEFAULT = {
-            "rollback_needed": False,
-            "rollback_reason": "",
-            "corrected_primary": p,
-            "corrected_secondary": s,
-            "lazarus_consistency": True,
-            "expected_stress": p * s / 10.0,
-        }
 
         raw = self._generate(prompt)
-        parsed = self._parse_json(raw, REAPPRAISAL_DEFAULT.copy())
+        default = {"rollback_needed": False, "rollback_reason": "", "corrected_primary": p,
+                     "corrected_secondary": s, "lazarus_consistency": True, "expected_stress": p*s/10}
+        parsed = self._parse_json(raw, default)
 
-        if not isinstance(parsed.get("rollback_needed"), bool):
-            parsed["rollback_needed"] = False
-        if not isinstance(parsed.get("rollback_reason"), str):
-            parsed["rollback_reason"] = ""
-        corrected_primary = parsed.get("corrected_primary", p)
-        if not isinstance(corrected_primary, (int, float)):
-            corrected_primary = p
-        corrected_primary = max(1, min(10, int(corrected_primary)))
-        corrected_secondary = parsed.get("corrected_secondary", s)
-        if not isinstance(corrected_secondary, (int, float)):
-            corrected_secondary = s
-        corrected_secondary = max(1, min(10, int(corrected_secondary)))
-        if not isinstance(parsed.get("lazarus_consistency"), bool):
-            parsed["lazarus_consistency"] = not parsed["rollback_needed"]
+        cp = max(1, min(10, int(parsed.get("corrected_primary", p))))
+        cs = max(1, min(10, int(parsed.get("corrected_secondary", s))))
 
-        parsed["corrected_primary"] = corrected_primary
-        parsed["corrected_secondary"] = corrected_secondary
-        parsed["expected_stress"] = corrected_primary * corrected_secondary / 10.0
+        if abs(cp - p) > 2:
+            cp = max(p - 2, min(p + 2, cp))
+        if abs(cs - s) > 2:
+            cs = max(s - 2, min(s + 2, cs))
 
-        parsed = self._validate_reappraisal_deterministic(
-            parsed, primary, secondary
-        )
-
-        p_orig = primary.get("primary_appraisal_score", 5)
-        s_orig = secondary.get("secondary_appraisal_score", 5)
-        p_corr_final = parsed["corrected_primary"]
-        s_corr_final = parsed["corrected_secondary"]
-        if abs(p_corr_final - p_orig) > 2:
-            parsed["corrected_primary"] = max(
-                p_orig - 2, min(p_orig + 2, p_corr_final)
-            )
-        if abs(s_corr_final - s_orig) > 2:
-            parsed["corrected_secondary"] = max(
-                s_orig - 2, min(s_orig + 2, s_corr_final)
-            )
-        parsed["expected_stress"] = (
-            parsed["corrected_primary"] * parsed["corrected_secondary"] / 10.0
-        )
-
+        parsed["corrected_primary"] = cp
+        parsed["corrected_secondary"] = cs
+        parsed["expected_stress"] = cp * cs / 10.0
         return parsed
 
-    def _validate_reappraisal_deterministic(
-        self, reappraisal: Dict, primary: Dict, secondary: Dict
-    ) -> Dict:
-        p_orig = primary.get("primary_appraisal_score", 5)
-        s_orig = secondary.get("secondary_appraisal_score", 5)
-        p_corr = reappraisal.get("corrected_primary", p_orig)
-        s_corr = reappraisal.get("corrected_secondary", s_orig)
-        threat_high = p_orig >= 7
-        threat_low = p_orig <= 3
-        coping_high = s_orig >= 7
-        coping_low = s_orig <= 3
-        coping_mid = not coping_high and not coping_low
-        violations = []
-        if threat_high and p_corr > p_orig:
-            violations.append(
-                "Lazarus constraint violated: high threat should not increase "
-                f"via reappraisal, but corrected_primary increased "
-                f"from {p_orig} to {p_corr}"
-            )
-        if coping_low and s_corr < s_orig:
-            violations.append(
-                "Lazarus constraint violated: low coping should not decrease "
-                f"further via reappraisal, but corrected_secondary decreased "
-                f"from {s_orig} to {s_corr}"
-            )
-        if threat_high and coping_low and p_corr < p_orig - 2:
-            violations.append(
-                "Lazarus constraint violated: high threat + low coping (high stress) "
-                "should not drastically reduce threat without new evidence, but "
-                f"corrected_primary dropped from {p_orig} to {p_corr}"
-            )
-        if threat_low and coping_high and s_corr > s_orig + 2:
-            violations.append(
-                "Lazarus constraint violated: low threat + high coping (low stress) "
-                "should not drastically inflate coping without new evidence, but "
-                f"corrected_secondary increased from {s_orig} to {s_corr}"
-            )
-        stress_orig = p_orig * s_orig / 10.0
-        stress_corr = p_corr * s_corr / 10.0
-        if threat_high and coping_low and stress_corr < stress_orig * 0.5:
-            violations.append(
-                "Lazarus constraint violated: high-stress state should not "
-                f"halve expected stress without justification; stress changed "
-                f"from {stress_orig:.1f} to {stress_corr:.1f}"
-            )
-        if violations:
-            p_fixed = p_corr
-            s_fixed = s_corr
-            if threat_high and p_corr > p_orig:
-                p_fixed = max(1, p_orig - 1)
-            if coping_low and s_corr < s_orig:
-                s_fixed = min(10, s_orig + 1)
-            if threat_high and coping_low and p_corr < p_orig - 2:
-                p_fixed = p_orig
-            if threat_low and coping_high and s_corr > s_orig + 2:
-                s_fixed = s_orig
-            reappraisal["corrected_primary"] = p_fixed
-            reappraisal["corrected_secondary"] = s_fixed
-            reappraisal["expected_stress"] = p_fixed * s_fixed / 10.0
-            reappraisal["rollback_needed"] = True
-            reappraisal["rollback_reason"] = "; ".join(violations)
-            reappraisal["lazarus_consistency"] = False
-            reappraisal["deterministic_correction_applied"] = True
-            reappraisal["llm_original_corrected_primary"] = p_corr
-            reappraisal["llm_original_corrected_secondary"] = s_corr
-        else:
-            reappraisal["lazarus_consistency"] = True
-            reappraisal["deterministic_correction_applied"] = False
-        return reappraisal
-
-    def detect_distortions(
-        self, text: str, corrected_primary: float, corrected_secondary: float
-    ) -> List[Dict]:
+    def detect_distortions(self, text: str, cp: float, cs: float) -> List[Dict]:
         lang = self._detect_language(text)
         if lang == "zh":
             prompt = (
-                "你是一名受过Aaron Beck认知行为疗法（CBT）训练的临床心理学家。\n"
-                "你的任务是使用ABC模型检测以下文本中的认知扭曲。\n\n"
-                "背景：该个体的校正后初级评估得分为"
-                f"{corrected_primary}/10，校正后次级评估得分为{corrected_secondary}/10。\n\n"
-                "仅检测以下5种认知扭曲（如存在）：\n"
-                "1. catastrophizing（灾难化）——预期最坏结果\n"
-                "2. overgeneralization（过度概括）——从单一事件得出广泛结论\n"
-                "3. all_or_nothing（全或无思维）——以非黑即白的方式看待事物\n"
-                "4. emotional_reasoning（情绪推理）——认为感受反映了现实\n"
-                "5. personalization（个人化）——将超出自己控制的事件归咎于自己\n\n"
-                "对每个检测到的扭曲，提供：\n"
-                "- type: 上述5种类型之一\n"
-                "- severity: 1-5分（1=轻度，5=重度）\n"
-                "- evidence: 支持该检测的文本中的具体引用或转述\n\n"
-                "仅以JSON数组回复：\n"
-                "[\n"
-                "  {\n"
-                '    "type": "catastrophizing",\n'
-                '    "severity": number,\n'
-                '    "evidence": "string"\n'
-                "  }\n"
-                "]\n\n"
-                "如未检测到扭曲，返回空数组：[]\n\n"
-                "待分析文本：\n"
-                f"{text}\n\n"
-                "JSON回复："
+                f"检测认知扭曲。初级={cp}/10, 次级={cs}/10\n"
+                "类型: catastrophizing/overgeneralization/all_or_nothing/emotional_reasoning/personalization\n"
+                '[{"type":"...", "severity":1-5, "evidence":"..."}]\n'
+                f"文本: {text}\n\nJSON:"
             )
         else:
             prompt = (
-                "You are a clinical psychologist trained in Aaron Beck's Cognitive Behavioral Therapy (CBT). "
-                "Your task is to detect cognitive distortions in the following text using the ABC model.\n\n"
-                "Context: The person's corrected primary appraisal score is "
-                f"{corrected_primary}/10 and corrected secondary appraisal score is {corrected_secondary}/10.\n\n"
-                "IMPORTANT: Only detect distortions when there is CLEAR EVIDENCE in the text. "
-                "If the text does not show obvious distorted thinking patterns, return an empty array []. "
-                "Do NOT detect distortions in normal emotional expressions or reasonable concerns.\n\n"
-                "Detect ONLY the following 5 types of cognitive distortions if present:\n"
-                "1. catastrophizing - expecting the worst possible outcome\n"
-                "2. overgeneralization - drawing broad conclusions from a single event\n"
-                "3. all_or_nothing - seeing things in black-and-white categories\n"
-                "4. emotional_reasoning - believing that feelings reflect reality\n"
-                "5. personalization - blaming oneself for events outside one's control\n\n"
-                "For EACH detected distortion, provide:\n"
-                "- type: one of the 5 types listed above\n"
-                "- severity: 1-5 scale (1=mild, 5=severe)\n"
-                "- evidence: specific quote or paraphrase from the text supporting this detection\n\n"
-                "Respond ONLY with a JSON array:\n"
-                "[\n"
-                "  {\n"
-                '    "type": "catastrophizing",\n'
-                '    "severity": number,\n'
-                '    "evidence": "string"\n'
-                "  }\n"
-                "]\n\n"
-                "If no distortions are detected, return an empty array: []\n\n"
-                "Text to analyze:\n"
-                f"{text}\n\n"
-                "JSON response:"
+                f"Detect cognitive distortions. P={cp}/10, S={cs}/10\n"
+                "Types: catastrophizing/overgeneralization/all_or_nothing/emotional_reasoning/personalization\n"
+                '[{"type":"...", "severity":1-5, "evidence":"..."}]\n'
+                f"Text: {text}\n\nJSON:"
             )
-        raw = self._generate(prompt)
-        try:
-            start = raw.find("[")
-            end = raw.rfind("]") + 1
-            if start >= 0 and end > start:
-                candidate = raw[start:end]
-                candidate = re.sub(r",\s*]", "]", candidate)
-                parsed = json.loads(candidate)
-            else:
-                parsed = self._parse_json(raw, {})
-                if isinstance(parsed, dict):
-                    for key in ["distortions", "cognitive_distortions", "results"]:
-                        if key in parsed and isinstance(parsed[key], list):
-                            parsed = parsed[key]
-                            break
-                    else:
-                        parsed = DISTORTION_DEFAULT
-                else:
-                    parsed = DISTORTION_DEFAULT
-        except json.JSONDecodeError:
-            parsed = DISTORTION_DEFAULT
-        if not isinstance(parsed, list):
-            parsed = DISTORTION_DEFAULT
-        validated = []
-        for item in parsed:
-            if not isinstance(item, dict):
-                continue
-            dtype = item.get("type", "")
-            if dtype not in DISTORTION_TYPES:
-                continue
-            severity = item.get("severity", 3)
-            if not isinstance(severity, (int, float)):
-                severity = 3
-            severity = max(1, min(5, int(severity)))
-            evidence = item.get("evidence", "")
-            if not isinstance(evidence, str):
-                evidence = str(evidence)
-            validated.append({"type": dtype, "severity": severity, "evidence": evidence})
-        return validated
 
-    def integrate(
-        self,
-        primary: Dict,
-        secondary: Dict,
-        reappraisal: Dict,
-        distortions: List[Dict],
-        causal_info: Optional[Dict],
-        dynamics_info: Optional[Dict],
-    ) -> Dict:
+        raw = self._generate(prompt)
+        parsed = self._parse_json(raw, DISTORTION_DEFAULT)
+        if isinstance(parsed, list):
+            validated = []
+            for item in parsed:
+                if isinstance(item, dict) and item.get("type") in DISTORTION_TYPES:
+                    sev = max(1, min(5, int(item.get("severity", 3))))
+                    item["severity"] = sev
+                    validated.append(item)
+            return validated
+        return DISTORTION_DEFAULT
+
+    def integrate(self, primary, secondary, reappraisal, distortions, causal_info, dynamics_info):
         p = reappraisal["corrected_primary"]
         s = reappraisal["corrected_secondary"]
         social = secondary.get("social_support_perceived", 5)
-        n_distortions = len(distortions)
-        a_proxy = (p - s) / 10.0
-        b_proxy = (s * social) / 100.0 - 0.5
-        c_proxy = social * (11 - n_distortions) / 100.0
+        n_dist = len(distortions)
+        a_proxy = round((p - s) / 10.0, 4)
+        b_proxy = round((s * social) / 100.0 - 0.5, 4)
+        c_proxy = round(social * (11 - n_dist) / 100.0, 4)
+
+        context = f"P={p}/10 S={s}/10 Social={social}/10 Distortions={n_dist} Cusp=[{a_proxy},{b_proxy},{c_proxy}]"
+        if causal_info:
+            context += f" Loops={len(causal_info.get('top_loops', []))}"
+        if dynamics_info:
+            context += f" Tipping={'Y' if dynamics_info.get('tipping_point_warning') else 'N'}"
 
         prompt = (
-            "You are a clinical psychologist integrating a multi-step Lazarus cognitive appraisal "
-            "with Cusp catastrophe theory dynamics for mental health assessment.\n\n"
-            "Assessment results:\n"
-            f"- Primary appraisal score (corrected): {p}/10\n"
-            f"- Secondary appraisal score (corrected): {s}/10\n"
-            f"- Perceived social support: {social}/10\n"
-            f"- Number of cognitive distortions: {n_distortions}\n"
-            f"- Distortion types: {', '.join(d.get('type', 'unknown') for d in distortions) if distortions else 'none'}\n"
-            f"- Cusp asymmetry proxy (a): {a_proxy:.3f}\n"
-            f"- Cusp bifurcation proxy (b): {b_proxy:.3f}\n"
-            f"- Cusp self-regulation proxy (c): {c_proxy:.3f}\n"
-        )
-        if causal_info:
-            prompt += (
-                f"\nCausal network info:\n"
-                f"- Central symptoms: {causal_info.get('central_symptoms', [])}\n"
-                f"- Top feedback loops: {len(causal_info.get('top_loops', []))} detected\n"
-            )
-        if dynamics_info:
-            prompt += (
-                f"\nDynamics info:\n"
-                f"- Resilience reserve: {dynamics_info.get('resilience_reserve', 'N/A')}\n"
-                f"- Critical distance: {dynamics_info.get('critical_distance', 'N/A')}\n"
-                f"- Tipping point warning: {dynamics_info.get('tipping_point_warning', False)}\n"
-            )
-        prompt += (
-            "\nProvide:\n"
-            "1. A comprehensive explanation of the person's mental state based on the Cusp catastrophe model, "
-            "Lazarus appraisal theory, and cognitive distortion analysis. Explain what the proxy values mean "
-            "in terms of the person's psychological state.\n"
-            "2. Personalized intervention recommendations based on the identified distortions, "
-            "central symptoms, and dynamics state.\n\n"
-            "Respond ONLY with a JSON object:\n"
-            "{\n"
-            '  "explanation": "string",\n'
-            '  "intervention": "string"\n'
-            "}\n\n"
-            "JSON response:"
+            "Integrate Lazarus+Cusp assessment into clinical narrative.\n\n"
+            f"{context}\n\n"
+            "{explanation:str, intervention:str}\n\nJSON:"
         )
         raw = self._generate(prompt)
         parsed = self._parse_json(raw, {"explanation": "", "intervention": ""})
-        explanation = parsed.get("explanation", "")
-        intervention = parsed.get("intervention", "")
-        if not isinstance(explanation, str):
-            explanation = str(explanation)
-        if not isinstance(intervention, str):
-            intervention = str(intervention)
-
         return {
             "cusp_proxies": {"a_proxy": a_proxy, "b_proxy": b_proxy, "c_proxy": c_proxy},
-            "explanation": explanation,
-            "intervention": intervention,
+            "explanation": str(parsed.get("explanation", "")),
+            "intervention": str(parsed.get("intervention", "")),
+        }
+
+    def full_chain(self, text: str, causal_info=None, dynamics_info=None) -> Dict[str, Any]:
+        text = text[:3000]
+
+        primary = self.primary_appraisal(text)
+        secondary = self.secondary_appraisal(text, primary)
+        raw_sec = secondary.get("secondary_appraisal_score", 5)
+        secondary = self._enforce_primary_secondary_consistency(primary, secondary)
+        reappraisal_result = self.reappraisal(primary, secondary, text)
+
+        cp = reappraisal_result.get("corrected_primary", primary["primary_appraisal_score"])
+        cs = reappraisal_result.get("corrected_secondary", secondary["secondary_appraisal_score"])
+        distortions = self.detect_distortions(text, cp, cs)
+
+        ideal_s = max(1, min(10, 11 - cp))
+        sec_gap = abs(cs - ideal_s)
+        trust = max(0.2, 1.0 - sec_gap / 10.0)
+
+        try:
+            integration = self.integrate(primary, secondary, reappraisal_result, distortions, causal_info, dynamics_info)
+        except Exception as e:
+            integration = {
+                "cusp_proxies": {"a_proxy": (cp-cs)/10, "b_proxy": cs*secondary.get("social_support_perceived",5)/100-0.5,
+                                  "c_proxy": secondary.get("social_support_perceived",5)*(11-len(distortions))/100},
+                "explanation": f"Fallback (error: {e})", "intervention": "Consider professional consultation.",
+            }
+
+        proxies = integration["cusp_proxies"]
+        proxies["a_proxy"] = round(trust * proxies["a_proxy"] + (1-trust) * ((cp - ideal_s)/10), 4)
+
+        meta_keys = ["_draft_raw", "_cove_verified", "_cove_consistent", "_cove_discrepancy",
+                      "_cve_correction", "_critiqued", "_critique_issues", "_critique_confidence",
+                      "_critique_adjustment", "_risk_floor_applied", "_risk_floor", "_risk_keywords_found",
+                      "_risk_adjustment", "_inverse_corrected", "_inverse_amount"]
+
+        calibration_meta = {
+            "trust_factor": round(trust, 4),
+            "raw_secondary": raw_sec,
+            "enforced_secondary": secondary.get("secondary_appraisal_score", 5),
+            "ideal_secondary": ideal_s,
+            "secondary_gap": round(sec_gap, 2),
+            "corrected_primary": cp,
+            "corrected_secondary": cs,
+        }
+        for k in meta_keys:
+            if k in primary:
+                calibration_meta[k.lstrip("_")] = primary[k]
+
+        return {
+            "primary_appraisal": primary,
+            "secondary_appraisal": secondary,
+            "reappraisal": reappraisal_result,
+            "cognitive_distortions": distortions,
+            "cusp_proxies": proxies,
+            "explanation": integration["explanation"],
+            "intervention": integration["intervention"],
+            "calibration_meta": calibration_meta,
         }

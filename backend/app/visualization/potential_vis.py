@@ -1,3 +1,7 @@
+"""
+CUSP potential surface visualization utilities.
+Generates potential function curves with fixed point markers for bifurcation analysis.
+"""
 import numpy as np
 from typing import Dict, Optional
 from app.cuspnet.utils import compute_potential, find_fixed_points, classify_fixed_points

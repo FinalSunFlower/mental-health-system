@@ -88,9 +88,9 @@ $$
 | 参数 | 含义 | 计算方式（Training-free） |
 |------|------|------------------|
 | $x$ | 心理状态变量（标准化综合指标） | PHQ-9 + GAD-7 加权合成 |
-| $a$ | 不对称因子（压力源 - 保护因子） | $\text{norm}(\text{PSS-10} - \text{CD-RISC})$ |
-| $b$ | 分岔因子（韧性储备 × 自我调节） | $\text{norm}(\text{CD-RISC} \times \text{MSPSS}) - \theta_{\text{bifurcation}}$ |
-| $c$ | 自调节强度（社会支持 × 认知重评） | $\text{norm}(\text{MSPSS} \times \text{认知重评分})$ |
+| $a$ | 不对称因子（压力源 - 保护因子） | $\text{norm}(\text{PSS-10}) - \text{norm}(\text{CD-RISC})$ |
+| $b$ | 分岔因子（韧性储备 × 自我调节） | $\text{norm}(\text{CD-RISC}) \times \text{norm}(\text{MSPSS}) - \theta_{\text{bifurcation}}$ |
+| $c$ | 自调节强度（社会支持 × 认知重评） | $\text{norm}(\text{MSPSS}) \times \text{norm}(\text{认知重评分})$ |
 
 **理论预测**：
 - $b > 0$：系统只有一个稳定不动点（健康或病理）
@@ -103,13 +103,13 @@ $$
 
 $$
 \begin{aligned}
-a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_{i}) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
-b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_{i}) &&\leftarrow \text{高中心性症状韧性储备更脆弱} \\
-c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_{i})      &&\leftarrow \text{桥接症状具有更强的跨簇调节}
+a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性储备更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状具有更强的跨簇调节}
 \end{aligned}
 $$
 
-其中 $\text{centrality}_{i}$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\text{bridge}_{i}$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
+其中 $\text{centrality}_i$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\text{bridge}_i$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
 
 **心理学依据**：高中心性症状（如"失眠"）既是压力的首要入口（$a_i$ 更大），也是韧性最容易崩溃的薄弱环节（$b_i$ 更小），这符合 Borsboom (2017) 的核心论断——"中心症状是维持网络病理结构的关键枢纽"。
 
@@ -168,7 +168,7 @@ $$
 
 1. 系统陷入病理吸引子（ΔV 坍塌至接近零）意味着个体失去了从病理状态恢复的"势能"
 2. 这种状态坍塌会导致**认知扭曲的固化**——个体的次级评价（应对效能）持续降低，初级评价（威胁感知）持续升高
-3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t{+}1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \operatorname{sign}(\Delta V \rightarrow 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
+3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t{+}1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \text{sign}(\Delta V \rightarrow 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
 4. 漂移后的 $a(t{+}1)$ 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
 
 这一机制在临床上有明确对应：抑郁患者的"反刍思维"（rumination）正是状态依赖参数演行的表现——低韧性状态→认知扭曲加剧→压力评估升高→韧性进一步降低。
@@ -205,9 +205,9 @@ $$
 
 $$
 \begin{aligned}
-a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_{i}) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
-b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_{i}) &&\leftarrow \text{高中心性症状韧性更脆弱} \\
-c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_{i})      &&\leftarrow \text{桥接症状跨簇调节更强}
+a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状跨簇调节更强}
 \end{aligned}
 $$
 
@@ -389,7 +389,7 @@ Cusp 模型在 AIC/BIC 上显著优于线性/逻辑模型，且能预测线性�
 #### 实验设计
 
 1. 在 $T_1$ 时间点计算每个个体的 $\Delta V$
-2. 将个体分为三组：高韧性（$\Delta V > 75^{\text{th}}$ percentile）、中韧性、低韧性（$\Delta V < 25^{\text{th}}$ percentile）
+2. 将个体分为三组：高韧性（$\Delta V > 75$th percentile）、中韧性、低韧性（$\Delta V < 25$th percentile）
 3. 在 $T_2$（后续时间点）追踪心理健康状态变化
 4. 检验低韧性组是否更可能发生临界转变（风险突然从低跳到高）
 
@@ -411,7 +411,7 @@ Cusp 模型在 AIC/BIC 上显著优于线性/逻辑模型，且能预测线性�
 
 **DAIC-WOZ**（Distress Analysis Interview Corpus）
 - 来源：Gratch, J. et al. (2014). The distress analysis interview corpus of human and computer interviews. *LREC*. USC 公开。
-- 数据内容：189 名参与者与虚拟面试官对话的完整文字转录稿 + PHQ-8 临床抑郁评分
+- 数据内容：30 名参与者与虚拟面试官对话的完整文字转录稿 + PHQ-8 临床抑郁评分
 - 测试方法：将对话转录稿输入 Qwen3.5-2B，利用 Lazarus 理论约束的 Prompt 提取"初级评价（威胁）"和"次级评价（应对）"，检验提取的认知参数是否与 PHQ-8 分数存在高度相关
 
 **eRisk**（Early Risk Prediction on the Internet）
@@ -569,7 +569,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 
 | # | 优化内容 | 目标问题 |
 |---|---------|---------|
-| 1 | Temperature从0.3降到0.1 | LLM评分极度不稳定 |
+| 1 | Temperature从0.25降到0.1（运行时参数） | LLM评分极度不稳定 |
 | 2 | 增加primary-secondary一致性检查 | 低威胁+低应对的逻辑矛盾 |
 | 3 | full_chain中调用一致性检查 | 确保链式推理一致性 |
 | 4 | Reappraisal修正幅度限制±2 | 过度修正问题 |
@@ -582,7 +582,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 | 11 | Primary Only模式使用推断的secondary | 公平对比 |
 | 12 | 增加binary classification评估指标 | 5级分类过于严格 |
 | 13 | run_exp4.py增加binary输出 | 结果展示 |
-| 14 | 样本量增加到40 | 统计稳定性 |
+| 14 | 样本量增加到80 | 统计稳定性 |
 | 15 | Composite阈值微调 | 等级边界优化 |
 
 **额外修复（2026-05-31）**：
@@ -593,7 +593,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 **Composite评分公式**：
 
 $$
-\text{composite} = \text{corrected\_primary} \times 0.70 + (10 - \text{corrected\_secondary}) \times 0.10 + \min(\text{n\_distortions}, 3) \times 0.20
+\text{composite} = \text{corrected primary} \times 0.70 + (10 - \text{corrected secondary}) \times 0.10 + \min(\text{n distortions}, 3) \times 0.20
 $$
 
 | Composite范围 | PHQ-8等级 |
@@ -624,7 +624,7 @@ $$
 | 项目 | 原始设计 | 当前实现 | 原因 |
 |------|---------|---------|------|
 | 因果拓扑排序算法 | SCORE | GES + BIC exact search | causal-learn 版本不含独立 SCORE API |
-| LLM 模型 | Qwen2.5-7B-Instruct | Qwen3.5-2B（本地） | 显存限制，2B模型可本地运行 |
+| LLM 模型 | Qwen2.5-7B-Instruct | Qwen3.5-2B（本地） | 显存限制，2B模型可在消费级GPU本地运行 |
 | Reappraisal 步骤 | 确定性逻辑 | LLM生成 + 确定性约束 | 提供更灵活的反思能力，同时保证理论一致性 |
 | 4-bit 量化 | 默认开启 | 默认关闭 | 2B模型无需量化 |
 | NHANES PHQ标签 | 9个 | 10个（含functional_impairment） | 数据实际包含10列DPQ |
@@ -639,6 +639,7 @@ $$
 ```
 mental-health-system/
 ├── README.md                            # 项目说明（本文件）
+├── ARCHITECTURE.md                      # 架构详细文档
 ├── .gitignore                           # Git忽略规则（含数据集排除）
 │
 └── backend/
@@ -673,14 +674,14 @@ mental-health-system/
         │   └── network_vis.py           # 中心性热力图
         │
         ├── data/                        # 数据管道
-        │   ├── loaders.py               # 5个数据集加载器
-        │   ├── preprocess.py            # 标准化 + 缺失值
-        │   ├── synthetic.py             # Cusp ODE 合成数据生成
+        │   ├── loaders.py               # 6个数据集加载器（Sachs, NHANES, Kossakowski, DAIC-WOZ, StudentLife, eRisk）
+        │   ├── preprocess.py            # 标准化 + 缺失值处理 + CUSP参数提取
+        │   ├── synthetic.py             # Cusp ODE 合成数据生成（用于验证实验）
         │   └── raw/                     # ⚠️ 原始数据集（不上传GitHub，见5.8节获取方式）
         │       ├── sachs_data.csv       #   Sachs蛋白质网络
         │       ├── DPQ_J.XPT            #   NHANES DPQ原始
         │       ├── nhanes_dpq.csv       #   NHANES DPQ派生
-        │       ├── daic_woz/            #   DAIC-WOZ访谈转录（189个文件夹）
+        │       ├── daic_woz/            #   DAIC-WOZ访谈转录（30个文件夹）
         │       └── erisk/               #   eRisk Reddit帖子（数百个JSON）
         │
         └── experiments/                 # 实验脚本
@@ -695,6 +696,18 @@ mental-health-system/
                 ├── ges_algorithm.py
                 ├── notears_baseline.py
                 └── ml_baselines.py
+│
+└── frontend/                           # 前端界面（React + TypeScript）
+    ├── src/
+    │   ├── pages/                      # 页面组件
+    │   │   ├── Home.tsx                # 首页
+    │   │   ├── Demo.tsx                # 演示页面
+    │   │   └── Architecture.tsx        # 架构说明页
+    │   ├── services/
+    │   │   └── api.ts                  # 后端API调用
+    │   └── App.tsx                     # 路由配置
+    ├── package.json
+    └── vite.config.ts
 ```
 
 > **数据集说明**：`backend/app/data/raw/` 目录下的所有数据文件已通过 `.gitignore` 排除，不会上传至 GitHub。请参照 [5.8节](#58-实验数据集获取方式汇总) 自行下载所需数据集并放置到对应目录。
@@ -713,6 +726,10 @@ mental-health-system/
 | 数据处理 | NumPy, Pandas | 数据加载与预处理 |
 | 可视化 | Matplotlib, NetworkX | 因果图 + 势函数 + 热力图 |
 | 数据库 | SQLite (开发) | 数据持久化 |
+| 前端框架 | React 19 + TypeScript + Vite | 用户界面 |
+| UI组件库 | Ant Design 6 | 界面组件 |
+| 图表可视化 | ECharts | 数据可视化展示 |
+| 状态管理 | Zustand | 前端状态管理 |
 
 ---
 
@@ -733,7 +750,13 @@ pip install -r requirements.txt
 
 **额外依赖**：
 - R 语言（≥4.4）：EBICglasso 需要 R 的 `qgraph` 包，安装后通过 `rpy2` 调用
+  ```r
+  # 在R中安装
+  install.packages("qgraph")
+  install.packages("glasso")
+  ```
 - 本地 LLM 模型：Qwen3.5-2B，需下载到本地路径（默认 `D:\Models\huggingface\Qwen3.5-2B`）
+  - 可从 [HuggingFace](https://huggingface.co/Qwen) 下载模型文件
 
 ### 8.2 数据集准备
 
@@ -743,7 +766,7 @@ pip install -r requirements.txt
 |--------|---------|---------|
 | Sachs | `raw/sachs_data.csv` | [Science 2005](https://www.science.org/doi/10.1126/science.1105809) |
 | NHANES | `raw/DPQ_J.XPT` + `raw/nhanes_dpq.csv` | [CDC NHANES](https://wwwn.cdc.gov/nchs/nhanes/) |
-| DAIC-WOZ | `raw/daic_woz/` (189个`*_P/`文件夹) | [USC](http://dcapswoz.ict.usc.edu/) 需申请 |
+| DAIC-WOZ | `raw/daic_woz/` (30个`*_P/`文件夹) | [USC](http://dcapswoz.ict.usc.edu/) 需申请 |
 | eRisk | `raw/erisk/all_combined/` (数百个JSON) | [CLEF](https://early.irlab.org/) |
 
 > **注**：部分实验（如实验2、3）使用合成数据，无需额外下载。实验1的Sachs数据为公开学术数据。
@@ -755,7 +778,19 @@ cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 8.4 运行实验
+API文档访问：http://localhost:8000/docs
+
+### 8.4 启动前端（可选）
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+前端访问：http://localhost:5173
+
+### 8.5 运行实验
 
 ```bash
 cd backend
