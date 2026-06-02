@@ -103,9 +103,9 @@ $$
 | 参数 | 含义 | 计算方式（Training-free） |
 |------|------|------------------|
 | $x$ | 心理状态变量（标准化综合指标） | PHQ-9 + GAD-7 加权合成 |
-| $a$ | 不对称因子（压力源 - 保护因子） | $\text{norm}(\text{PSS-10}) - \text{norm}(\text{CD-RISC})$ |
-| $b$ | 分岔因子（韧性储备 × 自我调节） | $\text{norm}(\text{CD-RISC}) \times \text{norm}(\text{MSPSS}) - \theta_{\text{bifurcation}}$ |
-| $c$ | 自调节强度（社会支持 × 认知重评） | $\text{norm}(\text{MSPSS}) \times \text{norm}(\text{认知重评分})$ |
+| $a$ | 不对称因子（压力源 - 保护因子） | $\mathrm{norm}(\mathrm{PSS\text{-}10}) - \mathrm{norm}(\mathrm{CD\text{-}RISC})$ |
+| $b$ | 分岔因子（韧性储备 × 自我调节） | $\mathrm{norm}(\mathrm{CD\text{-}RISC}) \times \mathrm{norm}(\mathrm{MSPSS}) - \theta_{\mathrm{bif}}$ |
+| $c$ | 自调节强度（社会支持 × 认知重评） | $\mathrm{norm}(\mathrm{MSPSS}) \times \mathrm{norm}(\mathrm{cog\text{-}reappraisal})$ |
 
 **理论预测**：
 - $b > 0$：系统只有一个稳定不动点（健康或病理）
@@ -118,13 +118,13 @@ $$
 
 $$
 \begin{aligned}
-a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
-b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性储备更脆弱} \\
-c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状具有更强的跨簇调节}
+a_i &= a \cdot (1 + \lambda_1 \cdot \mathrm{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \mathrm{centrality}_i) &&\leftarrow \text{高中心性症状韧性储备更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \mathrm{bridge}_i)      &&\leftarrow \text{桥接症状具有更强的跨簇调节}
 \end{aligned}
 $$
 
-其中 $\text{centrality}_i$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\text{bridge}_i$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
+其中 $\mathrm{centrality}_i$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\mathrm{bridge}_i$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
 
 **心理学依据**：高中心性症状（如"失眠"）既是压力的首要入口（$a_i$ 更大），也是韧性最容易崩溃的薄弱环节（$b_i$ 更小），这符合 Borsboom (2017) 的核心论断——"中心症状是维持网络病理结构的关键枢纽"。
 
@@ -148,10 +148,10 @@ $$
 **来源**：Luo, M. (2026). A circuit-based framework for depression. *Neuron*.
 
 $$
-\frac{dV_{\text{basin}}}{dt} = \sum_k \alpha_k \cdot \text{feedback}_{k}(x)
+\frac{dV_{\mathrm{basin}}}{dt} = \sum_k \alpha_k \cdot \mathrm{feedback}_k(x)
 $$
 
-其中 $V_{\text{basin}}$ 是病理吸引盆的深度，$\text{feedback}_{k}$ 是第 $k$ 个正反馈回路的强度。
+其中 $V_{\mathrm{basin}}$ 是病理吸引盆的深度，$\mathrm{feedback}_k$ 是第 $k$ 个正反馈回路的强度。
 
 **在 CuspNet 中的操作化**：从 EBICglasso 网络中识别正反馈回路（有向环），计算每个环的强度（边权重的几何平均），评估这些环如何加深病理吸引盆。
 
@@ -179,12 +179,19 @@ $$
 
 > **四公式闭环**：网络结构 $(\mathbf{A})$ → 动力学(ODE) → 吸引子 $(\Delta V)$ → 认知评价 $(a)$ → 网络结构
 
-**闭环关键步骤的动力学解释**：$\Delta V \to a$ 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
+**闭环关键步骤的动力学解释**：ΔV → a 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
 
 1. 系统陷入病理吸引子（ΔV 坍塌至接近零）意味着个体失去了从病理状态恢复的"势能"
 2. 这种状态坍塌会导致**认知扭曲的固化**——个体的次级评价（应对效能）持续降低，初级评价（威胁感知）持续升高
-3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t{+}1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \operatorname{sign}(\Delta V \to 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
-4. 漂移后的 $a(t{+}1)$ 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
+3. 在动力学上，这表现为参数 $a$ 随时间漂移：
+
+$$
+a(t+1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \operatorname{sign}(\Delta V \to 0)
+$$
+
+即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
+
+4. 漂移后的 $a(t+1)$ 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
 
 这一机制在临床上有明确对应：抑郁患者的"反刍思维"（rumination）正是状态依赖参数演行的表现——低韧性状态→认知扭曲加剧→压力评估升高→韧性进一步降低。
 
@@ -220,9 +227,9 @@ $$
 
 $$
 \begin{aligned}
-a_i &= a \cdot (1 + \lambda_1 \cdot \text{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
-b_i &= b \cdot (1 - \lambda_2 \cdot \text{centrality}_i) &&\leftarrow \text{高中心性症状韧性更脆弱} \\
-c_i &= c \cdot (1 + \lambda_3 \cdot \text{bridge}_i)      &&\leftarrow \text{桥接症状跨簇调节更强}
+a_i &= a \cdot (1 + \lambda_1 \cdot \mathrm{centrality}_i) &\quad& \leftarrow \text{高中心性症状承受更大压力} \\
+b_i &= b \cdot (1 - \lambda_2 \cdot \mathrm{centrality}_i) &&\leftarrow \text{高中心性症状韧性更脆弱} \\
+c_i &= c \cdot (1 + \lambda_3 \cdot \mathrm{bridge}_i)      &&\leftarrow \text{桥接症状跨簇调节更强}
 \end{aligned}
 $$
 
@@ -242,7 +249,7 @@ $$
 $$
 \begin{aligned}
 V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\
-\text{韧性储备} &= V(x_{\text{saddle}}) - V(x_{\text{healthy attractor}}) = \Delta V
+\text{韧性储备} &= V(x_{\mathrm{saddle}}) - V(x_{\mathrm{healthy}}) = \Delta V
 \end{aligned}
 $$
 
@@ -276,9 +283,9 @@ $$
 &\quad \text{输出}: \{\texttt{distortionType},\; \texttt{severity},\; \texttt{evidence}\} \\
 &\textbf{Step 5: Integration（整合）— 算法参数映射} \\
 &\quad \text{输入}: \text{Step 1-4 的全部输出} \\
-&\quad a_{\text{proxy}} = (\text{primary} - \text{secondary}) / 10 \quad &\leftarrow \text{威胁-应对差} \\
-&\quad b_{\text{proxy}} = (\text{secondary} \times \text{social}) / 100 - 0.5 \quad &\leftarrow \text{应对×支持} \\
-&\quad c_{\text{proxy}} = \text{social} \times (11 - n_{\text{distortions}}) / 100 \quad &\leftarrow \text{支持×重评}
+&\quad a_{\mathrm{proxy}} = (\text{primary} - \text{secondary}) / 10 \quad &\leftarrow \text{威胁-应对差} \\
+&\quad b_{\mathrm{proxy}} = (\text{secondary} \times \text{social}) / 100 - 0.5 \quad &\leftarrow \text{应对×支持} \\
+&\quad c_{\mathrm{proxy}} = \text{social} \times (11 - n_{\mathrm{distortions}}) / 100 \quad &\leftarrow \text{支持×重评}
 \end{aligned}
 $$
 
@@ -385,7 +392,7 @@ CuspNet F1=0.846，是PC/GES的5.9倍，NOTEARS的3.8倍。SID=4（远低于基�
 | 模型 | 方程 | 类型 |
 |------|------|------|
 | 线性回归 | $x = \beta_0 + \beta_1 a + \beta_2 b$ | 线性 |
-| 逻辑回归 | $P(\text{risk}) = \text{sigmoid}(\beta_0 + \beta_1 a + \beta_2 b)$ | 广义线性 |
+| 逻辑回归 | $P(\mathrm{risk}) = \sigma(\beta_0 + \beta_1 a + \beta_2 b)$ | 广义线性 |
 | Cusp 模型 | $\frac{dx}{dt} = a + bx - cx^3$ | 非线性动力学 |
 
 #### 评估方法
