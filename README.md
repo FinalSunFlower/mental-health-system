@@ -82,17 +82,18 @@ CuspNet 的每一层都由一个心理学权威公式驱动，形成理论-算�
 由于 CuspNet 使用 EBICglasso 估计偏相关网络，其底层假设是连续变量的多元正态分布（PHQ-9 等量表的 0-3 序数得分在此框架下近似连续），因此公式采用 GGM 标准形式：
 
 $$
-\begin{aligned}
-X \sim &\mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma}), && \text{精度矩阵 } \boldsymbol{\Theta} = \boldsymbol{\Sigma}^{-1} \\
-P(X_1, \ldots, X_p) &= (2\pi)^{-p/2} \, |\boldsymbol{\Theta}|^{1/2} \exp\!\left(-\tfrac{1}{2}(\mathbf{X}-\boldsymbol{\mu})^{\mathsf{T}} \boldsymbol{\Theta} (\mathbf{X}-\boldsymbol{\mu})\right)
-\end{aligned}
+X \sim \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma}), \quad \text{精度矩阵 } \boldsymbol{\Theta} = \boldsymbol{\Sigma}^{-1}
 $$
 
-其中 $\Theta_{ij} \neq 0$ 当且仅当症状 $i$ 和 $j$ 之间存在偏相关（控制其他所有变量后的条件依赖），这正是 EBICglasso 估计的对象。偏相关矩阵由 $\rho_{ij} = -\Theta_{ij} / \sqrt{\Theta_{ii}\Theta_{jj}}$ 得到。
+$$
+P(X_1, \ldots, X_p) = (2\pi)^{-p/2} |\boldsymbol{\Theta}|^{1/2} \exp\!\left(-\tfrac{1}{2}(\mathbf{X}-\boldsymbol{\mu})^{\mathsf{T}} \boldsymbol{\Theta} (\mathbf{X}-\boldsymbol{\mu})\right)
+$$
+
+其中 Θ_{ij} ≠ 0 当且仅当症状 i 和 j 之间存在偏相关（控制其他所有变量后的条件依赖），这正是 EBICglasso 估计的对象。偏相关矩阵由 ρ_{ij} = −Θ_{ij} / √(Θ_{ii}·Θ_{jj}) 得到。
 
 > **注**：若数据为二元变量（症状有/无），则应使用 Ising 模型 $P(\mathbf{X}) \propto \exp(\sum_{i<j} \beta_{ij}X_i X_j + \sum_i \alpha_i X_i)$ 配合 IsingFit（van Borkulo et al., 2014）估计。CuspNet 默认采用 GGM + EBICglasso 处理序数/连续量表数据，但框架兼容 Ising 模型用于二元数据场景。
 
-**理论约束**：Borsboom 明确指出，$\Theta_{ij} \neq 0$ 不只是统计关联，而是**因果交互**的候选——"症状之间的因果连接构成了障碍的本质"。
+**理论约束**：Borsboom 明确指出，Θ_{ij} ≠ 0 不只是统计关联，而是**因果交互**的候选——"症状之间的因果连接构成了障碍的本质"。
 
 ### 2.2 公式 2：Scheffer 临界转变公式（驱动 Layer 2）
 
@@ -107,9 +108,9 @@ $$
 | 参数 | 含义 | 计算方式（Training-free） |
 |------|------|------------------|
 | $x$ | 心理状态变量（标准化综合指标） | PHQ-9 + GAD-7 加权合成 |
-| $a$ | 不对称因子（压力源 - 保护因子） | $\mathrm{norm}(\mathrm{PSS\text{-}10}) - \mathrm{norm}(\mathrm{CD\text{-}RISC})$ |
-| $b$ | 分岔因子（韧性储备 × 自我调节） | $\mathrm{norm}(\mathrm{CD\text{-}RISC}) \times \mathrm{norm}(\mathrm{MSPSS}) - \theta_{\mathrm{bif}}$ |
-| $c$ | 自调节强度（社会支持 × 认知重评） | $\mathrm{norm}(\mathrm{MSPSS}) \times \mathrm{norm}(\mathrm{cog\text{-}reappraisal})$ |
+| $a$ | 不对称因子（压力源 − 保护因子） | norm(PSS-10) − norm(CD-RISC) |
+| $b$ | 分岔因子（韧性储备 × 自我调节） | norm(CD-RISC) × norm(MSPSS) − θ_bif |
+| $c$ | 自调节强度（社会支持 × 认知重评） | norm(MSPSS) × norm(认知重评分) |
 
 **理论预测**：
 - $b > 0$：系统只有一个稳定不动点（健康或病理）
@@ -128,7 +129,7 @@ c_i &= c \cdot (1 + \lambda_3 \cdot \mathrm{bridge}_i)      &&\leftarrow \text{�
 \end{aligned}
 $$
 
-其中 $\mathrm{centrality}_i$ 是症状 $i$ 的预期影响中心性（来自 Layer 1 Step 1.4），$\mathrm{bridge}_i$ 是桥接中心性，$\lambda_1, \lambda_2, \lambda_3$ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
+其中 **centrality_i** 是症状 i 的预期影响中心性（来自 Layer 1 Step 1.4），**bridge_i** 是桥接中心性，λ₁, λ₂, λ₃ 是分配系数（从数据中通过矩估计获得，无需梯度训练）。
 
 **心理学依据**：高中心性症状（如"失眠"）既是压力的首要入口（$a_i$ 更大），也是韧性最容易崩溃的薄弱环节（$b_i$ 更小），这符合 Borsboom (2017) 的核心论断——"中心症状是维持网络病理结构的关键枢纽"。
 
@@ -155,7 +156,7 @@ $$
 \frac{dV_{\mathrm{basin}}}{dt} = \sum_k \alpha_k \cdot \mathrm{feedback}_k(x)
 $$
 
-其中 $V_{\mathrm{basin}}$ 是病理吸引盆的深度，$\mathrm{feedback}_k$ 是第 $k$ 个正反馈回路的强度。
+其中 **V_basin** 是病理吸引盆的深度，**feedback_k** 是第 k 个正反馈回路的强度。
 
 **在 CuspNet 中的操作化**：从 EBICglasso 网络中识别正反馈回路（有向环），计算每个环的强度（边权重的几何平均），评估这些环如何加深病理吸引盆。
 
@@ -181,7 +182,7 @@ $$
 \end{array}
 $$
 
-> **四公式闭环**：网络结构 $(\mathbf{A})$ → 动力学(ODE) → 吸引子 $(\Delta V)$ → 认知评价 $(a)$ → 网络结构
+> **四公式闭环**：网络结构 (A) → 动力学(ODE) → 吸引子 (ΔV) → 认知评价 (a) → 网络结构
 
 **闭环关键步骤的动力学解释**：ΔV → a 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
 
@@ -257,7 +258,7 @@ V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\
 \end{aligned}
 $$
 
-这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 $\Delta V \to 0$ 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
+这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 ΔV → 0 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
 
 ### 创新点 4：Lazarus 理论约束的混合认知评价架构——LLM 文本理解 + 算法临床推理（Hybrid Appraisal Architecture）
 
@@ -396,7 +397,7 @@ CuspNet F1=0.846，是PC/GES的5.9倍，NOTEARS的3.8倍。SID=4（远低于基�
 | 模型 | 方程 | 类型 |
 |------|------|------|
 | 线性回归 | $x = \beta_0 + \beta_1 a + \beta_2 b$ | 线性 |
-| 逻辑回归 | $P(\mathrm{risk}) = \sigma(\beta_0 + \beta_1 a + \beta_2 b)$ | 广义线性 |
+| 逻辑回归 | P(risk) = σ(β₀ + β₁a + β₂b) | 广义线性 |
 | Cusp 模型 | $\frac{dx}{dt} = a + bx - cx^3$ | 非线性动力学 |
 
 #### 评估方法
@@ -421,8 +422,8 @@ Cusp模型在AIC/BIC上显著优于基线模型（ΔAIC>2400），Pseudo-R²=0.8
 
 #### 实验设计
 
-1. 在 $T_1$ 时间点计算每个个体的 $\Delta V$
-2. 将个体分为三组：高韧性（$\Delta V > 75$th percentile）、中韧性、低韧性（$\Delta V < 25$th percentile）
+1. 在 T₁ 时间点计算每个个体的 ΔV
+2. 将个体分为三组：高韧性（ΔV > 75th percentile）、中韧性、低韧性（ΔV < 25th percentile）
 3. 在 $T_2$（后续时间点）追踪心理健康状态变化
 4. 检验低韧性组是否更可能发生临界转变（风险突然从低跳到高）
 
