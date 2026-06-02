@@ -1,5 +1,7 @@
 # CuspNet: Psychology-Theory-Constrained Training-free Causal-Dynamical Mental Health Assessment Framework
 
+[![English](https://img.shields.io/badge/🌐-English-blue?style=flat-square)](README.en.md) **|** [中文版](#)
+
 > **CuspNet** — 心理学理论约束的 Training-free 因果-动力学心理健康评估框架
 >
 > 将 Borsboom 网络理论、Scheffer 临界转变理论、Lazarus 认知评价理论、Luo Minmin 病理吸引子理论四大权威心理学公式直接编码为算法的数学约束，在 Training-free 条件下实现因果发现、动力学预测与可解释性的统一。
@@ -381,13 +383,13 @@ CuspNet F1=0.846，是PC/GES的5.9倍，NOTEARS的3.8倍。SID=4（远低于基�
 **Kossakowski 等人 239 天高频追踪数据集**（临界转变验证的黄金数据）
 - 来源：Kossakowski, J. J. et al. (2017). Data from 'The data of the Emotional Dynamics study'. *Journal of Open Psychology Data*, 5(1).
 - 数据内容：对一名抗抑郁药减量患者进行了长达 239 天的高频追踪，每天多次填写心理情绪问卷
-- 完美契合点：这个数据集就是为了测试"临界转变 (Tipping Point) 和预警信号 (Critical Slowing Down)"而公开的。可以用这一个人的高频数据完美拟合出状态崩溃前 Cusp 吸引子的形变
+- 契合点：该数据集专为测试"临界转变 (Tipping Point) 和预警信号 (Critical Slowing Down)"而公开。可用此高频数据拟合状态崩溃前 Cusp 吸引子的形变
 - 关键验证：在患者状态"崩盘"前 14 天，CuspNet 的韧性储备 ΔV 是否持续下降并趋近于零
 
 **StudentLife Dataset**（学校场景纵向数据）
 - 来源：Wang, R. et al. (2014). StudentLife: assessing mental health, academic performance and behavioral trends of college students using smartphones. *UbiComp 2014*. Dartmouth College 开源。
 - 数据内容：48 名大学生在一个学期（10 周）内的持续追踪，包含 PHQ-9 抑郁评估、感知压力、手机被动传感数据（社交、睡眠、活动）
-- 完美契合点：替代学校场景纵向数据，验证 Cusp 系统的"不对称因子 a（压力）"如何随学期推进引发心理状态的非线性跳跃
+- 契合点：替代学校场景纵向数据，验证 Cusp 系统的"不对称因子 a（压力）"如何随学期推进引发心理状态的非线性跳跃
 
 #### 对比模型
 
@@ -406,7 +408,7 @@ CuspNet F1=0.846，是PC/GES的5.9倍，NOTEARS的3.8倍。SID=4（远低于基�
 
 #### 实际结果
 
-Cusp模型在AIC/BIC上大幅领先（ΔAIC>2400），Pseudo-R²=0.856（线性0.217，逻辑0.245），分类准确率100%（线性48.1%，逻辑51.8%），Cusp动力学CV MAE=0.006（线性0.083）。验证了尖点灾变模型远优于传统线性/逻辑模型。
+Cusp模型在AIC/BIC上显著优于基线模型（ΔAIC>2400），Pseudo-R²=0.856（线性0.217，逻辑0.245），在当前实验设定下分类准确率达100%（线性48.1%，逻辑51.8%），Cusp动力学CV MAE=0.006（线性0.083）。结果表明尖点灾变模型在该数据集上的拟合优度与预测能力均显著优于传统线性/逻辑回归。
 
 ### 5.4 实验 3：韧性储备的预测效度（验证创新点 3）
 
@@ -515,7 +517,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 | 风险预测 | AUC-ROC | NHANES | CuspNet 0.857 > RF 0.832 > XGBoost 0.823 > 阈值法 0.756 ✅ |
 | 韧性预测 | AUC-ROC | StudentLife | EWS AUC=0.929, 前瞻AUC=0.946 ✅ |
 | 可解释性 | 临床专家评分 (1-5) | NHANES | CuspNet 5/5 > RF/XGBoost 2/5 ✅ |
-| 干预建议质量 | 临床专家评分 (1-5) | NHANES | CuspNet 唯一提供因果解释和干预指导 ✅ |
+| 干预建议质量 | 临床专家评分 (1-5) | NHANES | CuspNet 为当前对比方法中唯一提供因果解释和干预指导的方案 ✅ |
 | 召回率 | Recall | NHANES | CuspNet 0.787 >> RF/XGBoost 0.519（更少漏诊）✅ |
 | 数据需求 | 所需标注样本量 | — | CuspNet = 0, ML = 500+ ✅ |
 
@@ -576,7 +578,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 - CuspNet F1=0.846，是PC/GES的**5.9倍**，NOTEARS的**3.8倍**
 - SID=4（远低于PC/GES的12和NOTEARS的14），说明因果方向推断更准确
 - 识别出5个桥接症状：Akt, PKA, PIP3, PKC, Raf
-- **结论**：理论约束的因果发现（GES × EBICglasso × Borsboom约束）远优于纯数据驱动方法
+- **结论**：理论约束的因果发现（GES × EBICglasso × Borsboom约束）在该数据集上显著优于纯数据驱动方法
 
 ---
 
@@ -595,11 +597,11 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 | Cusp (dynamics) | — | — | **0.006 ± 0.004** |
 
 **关键发现**：
-- Cusp在AIC/BIC上均**大幅领先**（ΔAIC>2400），这是压倒性优势
+- Cusp在AIC/BIC上均**显著优于**基线模型（ΔAIC>2400），表现出显著的模型拟合优势
 - Pseudo-R²=0.856，是线性模型的**3.9倍**，逻辑模型的**3.5倍**
-- Cusp分类准确率100%，线性48.1%/逻辑51.8%（接近随机猜测）
-- Cusp动力学CV MAE=0.006，远低于线性的0.083
-- **结论**：尖点灾变模型远优于传统线性/逻辑模型，验证了心理健康状态的非线性突变特征
+- Cusp在当前实验设定下分类准确率达100%，线性48.1%/逻辑51.8%（接近随机猜测）
+- Cusp动力学CV MAE=0.006，显著低于线性的0.083
+- **结论**：尖点灾变模型在该数据集上显著优于传统线性/逻辑回归，支持心理健康状态存在非线性突变特征的假设
 
 ---
 
@@ -692,11 +694,11 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 
 **关键发现**：
 - CuspNet AUC最高（0.857），领先所有基线方法
-- CuspNet Recall=0.787，远超RF/XGBoost的0.519——在抑郁症筛查中，高召回率意味着更少的漏诊
-- 所有对比的Cohen's d均>1.0（大效应），说明CuspNet的优势是实质性的
+- CuspNet Recall=0.787，显著优于RF/XGBoost的0.519——在抑郁症筛查中，高召回率意味着更少的漏诊
+- 所有对比的Cohen's d均>1.0（大效应），说明CuspNet的优势具有实质性的效应量
 - CuspNet vs Threshold达到统计显著（p=0.031），3折样本量有限下其他对比未达显著但效应量大
-- CuspNet是唯一提供因果解释和干预指导的方法
-- **结论**：CUSPNet三层架构在端到端评估中AUC最高、Recall最高、可解释性最强
+- CuspNet为当前对比方法中唯一提供因果解释和干预指导的方案
+- **结论**：CUSPNet三层架构在当前实验设定下AUC和Recall均表现最优，且具备更强的可解释性
 
 ---
 
@@ -1013,9 +1015,9 @@ python run_exp5.py
    - 识别出5个桥接症状：Akt, PKA, PIP3, PKC, Raf
 
 2. **实验2（Cusp拟合）** ✅ 最终版
-   - Cusp AIC=-8881，ΔAIC>2400（vs 线性/逻辑），压倒性优势
+   - Cusp AIC=-8881，ΔAIC>2400（vs 线性/逻辑），显著优势
    - Pseudo-R²=0.856，是线性模型的3.9倍
-   - Cusp分类准确率100%（线性48.1%，逻辑51.8%）
+   - Cusp在当前实验设定下分类准确率达100%（线性48.1%，逻辑51.8%）
    - Cusp动力学CV MAE=0.006（线性0.083）
 
 3. **实验3（韧性预测）** ✅ 最终版
@@ -1033,9 +1035,9 @@ python run_exp5.py
 
 5. **实验5（端到端预测）** ✅ 最终版
    - CuspNet AUC=0.857，领先所有基线方法
-   - Recall=0.787，远超RF/XGBoost的0.519（更少漏诊）
+   - Recall=0.787，显著优于RF/XGBoost的0.519（更少漏诊）
    - CuspNet vs Threshold统计显著（p=0.031）
-   - 唯一提供因果解释和干预指导的方法
+   - 当前对比方法中唯一提供因果解释和干预指导的方案
    - 3折交叉验证+DeLong统计显著性检验
 
 **项目状态**：五个实验全部完成，数据完整，形成从Layer1到端到端的完整证据链，验证了CUSPNet架构的合理性和能力。
