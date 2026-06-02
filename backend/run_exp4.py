@@ -6,82 +6,70 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 print("=" * 60)
-print("EXPERIMENT 4: LLM-based Lazarus Appraisal")
+print("EXPERIMENT 4: Unconstrained LLM vs Lazarus-Constrained LLM")
 print("=" * 60)
 
 from app.experiments.exp4_llm_appraisal import run_exp4
 
+_MODEL_NAME = os.environ.get(
+    "CUSPNET_LLM_MODEL",
+    r"D:\Models\huggingface\Qwen3.5-2B",
+)
+
 try:
     results = run_exp4(
         dataset="erisk",
-        use_lazarus_constraints=True,
-        n_reflection_steps=3,
         max_samples=80,
-        model_name=r"D:\Models\huggingface\Qwen3.5-2B",
+        model_name=_MODEL_NAME,
     )
 
     print("\n--- Dataset Info ---")
     di = results["dataset_info"]
     print("  Dataset:", di["name"])
-    print("  N interviews:", di["n_interviews"])
-    print("  N with PHQ-8:", di["n_with_phq8"])
+    print("  N samples:", di["n_samples"])
+    print("  Label distribution:", di["label_distribution"])
 
-    if "full_chain" in results:
-        fc = results["full_chain"]
-        aa = fc["appraisal_accuracy"]
-        dl = fc["depression_level_accuracy"]
-        print("\n--- Full Lazarus Chain ---")
-        print("  Overall accuracy:       %.4f" % aa["overall_accuracy"])
-        print("  Primary appraisal acc:  %.4f" % aa["primary_appraisal_accuracy"])
-        print("  Secondary appraisal acc:%.4f" % aa["secondary_appraisal_accuracy"])
-        print("  Reappraisal accuracy:   %.4f" % aa["reappraisal_accuracy"])
-        print("  Distortion F1:          %.4f" % aa["distortion_detection_f1"])
+    if "lazarus_constrained" in results:
+        lc = results["lazarus_constrained"]
+        dl = lc["depression_level_accuracy"]
+        print("\n--- Lazarus-Constrained LLM ---")
+        print("  Depression level acc:   %.4f" % dl["accuracy"])
+        print("  Depression level kappa: %.4f" % dl["kappa"])
+        if "accuracy_ci" in lc:
+            ci = lc["accuracy_ci"]
+            print("  Accuracy 95%% CI: [%.4f, %.4f]" % (ci.get("lower", 0), ci.get("upper", 0)))
+
+    if "unconstrained" in results:
+        uc = results["unconstrained"]
+        dl = uc["depression_level_accuracy"]
+        print("\n--- Unconstrained LLM (no theory) ---")
         print("  Depression level acc:   %.4f" % dl["accuracy"])
         print("  Depression level kappa: %.4f" % dl["kappa"])
 
-    if "primary_only" in results:
-        po = results["primary_only"]
-        aa_po = po["appraisal_accuracy"]
-        dl_po = po["depression_level_accuracy"]
-        print("\n--- Primary Only (No Lazarus Chain) ---")
-        print("  Overall accuracy:       %.4f" % aa_po["overall_accuracy"])
-        print("  Depression level acc:   %.4f" % dl_po["accuracy"])
-        print("  Depression level kappa: %.4f" % dl_po["kappa"])
-
     if "comparison" in results:
-        comp = results["comparison"]["lazarus_chain_improvement"]
-        print("\n--- Lazarus Chain Improvement ---")
-        print("  Overall accuracy delta:  %+.4f" % comp["overall_accuracy"])
-        print("  Distortion F1 delta:     %+.4f" % comp["distortion_f1"])
-        print("  Depression level acc:    %+.4f" % comp["depression_level_accuracy"])
-        print("  Depression level kappa:  %+.4f" % comp["depression_level_kappa"])
-
-    if "binary_classification" in results:
-        bc = results["binary_classification"]
-        print("\n--- Binary Classification (Clinical vs Non-clinical) ---")
-        fc_bin = bc["full_chain"]
-        po_bin = bc["primary_only"]
-        print(f"  Full Chain:  acc={fc_bin['accuracy']:.4f} F1={fc_bin['f1']:.4f} prec={fc_bin['precision']:.4f} rec={fc_bin['recall']:.4f} AUC={fc_bin.get('auc',0):.4f} thresh={fc_bin.get('optimal_threshold',0.3):.2f}")
-        print(f"  Primary Only: acc={po_bin['accuracy']:.4f} F1={po_bin['f1']:.4f} prec={po_bin['precision']:.4f} rec={po_bin['recall']:.4f} AUC={po_bin.get('auc',0):.4f} thresh={po_bin.get('optimal_threshold',0.3):.2f}")
-        print(f"  N samples: {bc['n_samples']} (pos={bc['n_positive']}, neg={bc['n_negative']})")
+        comp = results["comparison"]["lazarus_vs_unconstrained"]
+        print("\n--- Lazarus Framework Effect ---")
+        print("  Accuracy delta:  %+.4f" % comp["accuracy_delta"])
+        print("  Kappa delta:     %+.4f" % comp["kappa_delta"])
+        print("  %s" % results["comparison"]["interpretation"])
 
     if "pearson_correlation" in results:
         pc = results["pearson_correlation"]
         print("\n--- Pearson Correlation ---")
         for key, val in pc.items():
-            print(f"  {key}: r={val['r']:.4f}, p={val['p']:.4f}")
+            print("  %s: r=%.4f, p=%.6f" % (key, val["r"], val["p"]))
 
-    if "composite_correlation" in results:
-        cc = results["composite_correlation"]
-        print("\n--- Composite Correlation ---")
-        for key, val in cc.items():
-            print(f"  {key}: r={val['r']:.4f}, p={val['p']:.4f}")
-
-    if "icc" in results:
-        icc = results["icc"]
-        print("\n--- ICC ---")
-        for key, val in icc.items():
-            print(f"  {key}: {val}")
+    if "binary_classification" in results:
+        bc = results["binary_classification"]
+        print("\n--- Binary Classification (Clinical vs Non-clinical) ---")
+        if "lazarus_constrained" in bc:
+            lc_bin = bc["lazarus_constrained"]
+            print("  Lazarus:    acc=%.4f F1=%.4f prec=%.4f rec=%.4f AUC=%.4f" % (
+                lc_bin["accuracy"], lc_bin["f1"], lc_bin["precision"], lc_bin["recall"], lc_bin.get("auc", 0)))
+        if "unconstrained" in bc:
+            uc_bin = bc["unconstrained"]
+            print("  Unconstr:   acc=%.4f F1=%.4f prec=%.4f rec=%.4f AUC=%.4f" % (
+                uc_bin["accuracy"], uc_bin["f1"], uc_bin["precision"], uc_bin["recall"], uc_bin.get("auc", 0)))
 
     print("\nExperiment 4 COMPLETED SUCCESSFULLY!")
 

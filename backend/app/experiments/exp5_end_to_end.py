@@ -763,6 +763,7 @@ def run_exp5(
     random_state: int = 42,
     ebic_gamma: float = 0.5,
     score_threshold: float = 0.01,
+    max_samples: Optional[int] = None,
 ) -> Dict:
     from sklearn.model_selection import StratifiedKFold
 
@@ -788,6 +789,11 @@ def run_exp5(
             if "dep" in name.lower() or "little" in name.lower():
                 phq_col_idx = i
                 break
+        if max_samples is not None and max_samples < len(y):
+            rng = np.random.RandomState(random_state)
+            idx = rng.choice(len(y), max_samples, replace=False)
+            X_features = X_features[idx]
+            y = y[idx]
     elif dataset.lower() == "daic_woz":
         loader = DAICWOZLoader()
         data = loader.load()
@@ -947,7 +953,7 @@ def run_exp5(
 
     if dataset.lower() == "daic_woz" and len(phq8_scores) > 5:
         try:
-            llm = LazarusAppraisalChain(model_name=r"D:\Models\huggingface\Qwen3.5-2B")
+            llm = LazarusAppraisalChain()
             proxy_a_list = []
             proxy_b_list = []
             proxy_c_list = []
@@ -984,12 +990,14 @@ def run_exp5(
             sample_texts = list(transcripts.values())[:min(30, len(transcripts))]
             sample_labels = phq8_scores[:len(sample_texts)]
             try:
+                from app.core.config import settings as _s
+                _model_name = _s.LLM_MODEL_NAME
                 import torch as _torch
                 dep_tokenizer = AutoTokenizer.from_pretrained(
-                    r"D:\Models\huggingface\Qwen3.5-2B", trust_remote_code=True
+                    _model_name, trust_remote_code=True
                 )
                 dep_model = AutoModelForCausalLM.from_pretrained(
-                    r"D:\Models\huggingface\Qwen3.5-2B",
+                    _model_name,
                     device_map="auto", trust_remote_code=True, torch_dtype=_torch.bfloat16,
                 )
                 dep_pipe = pipeline("text-generation", model=dep_model, tokenizer=dep_tokenizer)

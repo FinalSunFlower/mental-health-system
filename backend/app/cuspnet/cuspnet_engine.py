@@ -57,7 +57,7 @@ class CuspNetEngine:
             norm_group=config.get("norm_group", "general"),
         )
         self.layer3 = LazarusAppraisalChain(
-            model_name=config.get("llm_model_name", r"D:\Models\huggingface\Qwen3.5-2B"),
+            model_name=config.get("llm_model_name", None),
             device=config.get("llm_device", "cuda"),
             load_in_4bit=config.get("llm_load_in_4bit", False),
             max_new_tokens=config.get("llm_max_new_tokens", 2048),

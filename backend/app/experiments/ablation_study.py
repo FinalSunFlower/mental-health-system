@@ -199,9 +199,12 @@ def _run_ablation_llm(
     phq8_scores: List[int],
     config: Dict,
     n_reflection_steps: int = 3,
-    model_name: str = r"D:\Models\huggingface\Qwen3.5-2B",
+    model_name: str = None,
 ) -> Dict:
     result = {}
+    if model_name is None:
+        from app.core.config import settings
+        model_name = settings.LLM_MODEL_NAME
 
     if not config["use_llm"]:
         result["method"] = "no_llm"
