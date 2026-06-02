@@ -3,7 +3,21 @@
 > **CuspNet** — 心理学理论约束的 Training-free 因果-动力学心理健康评估框架
 >
 > 将 Borsboom 网络理论、Scheffer 临界转变理论、Lazarus 认知评价理论、Luo Minmin 病理吸引子理论四大权威心理学公式直接编码为算法的数学约束，在 Training-free 条件下实现因果发现、动力学预测与可解释性的统一。
->
+
+**Keywords**: causal discovery · catastrophe theory · cusp model · network psychometrics · Lazarus cognitive appraisal · early warning signal · resilience quantification · training-free · zero-shot LLM · computational psychiatry · mental health · EBICglasso · GES · theory-constrained AI
+
+> 📖 **Citing this work**:
+> ```bibtex
+> @misc{cusnet2026,
+>   title={CuspNet: A Psychology-Theory-Constrained Training-free 
+>          Causal-Dynamical Mental Health Assessment Framework},
+>   author={Sunflower},
+>   year={2026},
+>   howpublished={\url{https://github.com/FinalSunFlower/mental-health-system}},
+>   note={Code and experimental results available at GitHub}
+> }
+> ```
+
 > **注**：本文的 "Training-free" 指无需海量标注样本的梯度反向传播。EBICglasso 虽涉及正则化参数优化，但其本质是无监督的凸优化，不依赖标注数据；GES 基于评分搜索（BIC 准则）；Cusp ODE 基于解析求解；LLM 基于零样本推理。全链路均不涉及监督学习的权重训练。
 
 ---
@@ -17,9 +31,10 @@
 - [5. 实验设计（全公开数据集）](#5-实验设计全公开数据集)
 - [6. 当前实验进度与结果](#6-当前实验进度与结果)
 - [7. 项目结构与技术栈](#7-项目结构与技术栈)
-- [8. 快速开始](#8-快速开始)
-- [9. 文献支撑](#9-文献支撑)
-- [10. 开发日志](#10-开发日志)
+- [8. 前端交互系统](#8-前端交互系统)
+- [9. 快速开始](#9-快速开始)
+- [10. 文献支撑](#10-文献支撑)
+- [11. 开发日志](#11-开发日志)
 
 ---
 
@@ -125,8 +140,8 @@ $$
 
 | 评价类型 | 含义 | 在 CuspNet 中的操作化 |
 |---------|------|---------------------|
-| 初级评价 | 威胁评估 | LLM 从开放式回答中提取威胁认知（零样本） |
-| 次级评价 | 应对资源评估 | MSPSS + CD-RISC（问卷直接测量） |
+| 初级评价 | 威胁评估 | LLM 症状识别（二分类）+ 规则检测 → 算法映射为威胁评分 |
+| 次级评价 | 应对资源评估 | 关键词扫描 → 算法计算应对效能与社会支持 |
 
 ### 2.4 公式 4：Luo Minmin 病理吸引子公式（驱动多尺度层）
 
@@ -158,17 +173,17 @@ $$
 & \downarrow & \\
 \text{Luo 公式} & \rightarrow & \text{预测正反馈加深吸引盆} \rightarrow \mathbf{A}\text{ 中的环} \rightarrow \Delta V \text{ 增大} \rightarrow \text{验证 Scheffer 预测} \\
 & \downarrow & \\
-\text{Lazarus 公式} & \rightarrow & \text{约束 LLM 推理} \rightarrow \text{提取 } a \text{ 的认知成分} \rightarrow \text{反馈到 Cusp 参数}
+\text{Lazarus 公式} & \rightarrow & \text{约束 LLM-算法混合评价} \rightarrow \text{提取 } a \text{ 的认知成分} \rightarrow \text{反馈到 Cusp 参数}
 \end{array}
 $$
 
-> **四公式闭环**：网络结构 $(\mathbf{A})$ $\rightarrow$ 动力学(ODE) $\rightarrow$ 吸引子 $(\Delta V)$ $\rightarrow$ 认知评价 $(a)$ $\rightarrow$ 网络结构
+> **四公式闭环**：网络结构 $(\mathbf{A})$ → 动力学(ODE) → 吸引子 $(\Delta V)$ → 认知评价 $(a)$ → 网络结构
 
-**闭环关键步骤的动力学解释**：$\Delta V \rightarrow a$ 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
+**闭环关键步骤的动力学解释**：$\Delta V \to a$ 这一步并非简单的直接映射，而是基于**状态依赖的参数演化（State-dependent Parameter Drift）**机制：
 
 1. 系统陷入病理吸引子（ΔV 坍塌至接近零）意味着个体失去了从病理状态恢复的"势能"
 2. 这种状态坍塌会导致**认知扭曲的固化**——个体的次级评价（应对效能）持续降低，初级评价（威胁感知）持续升高
-3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t{+}1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \text{sign}(\Delta V \rightarrow 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
+3. 在动力学上，这表现为参数 $a$ 随时间漂移：$a(t{+}1) = a(t) + \eta \cdot \Delta V^{-1} \cdot \operatorname{sign}(\Delta V \to 0)$，即韧性储备越低，不对称因子 $a$ 向病理方向的漂移越快
 4. 漂移后的 $a(t{+}1)$ 反馈到 Cusp ODE，进一步加深病理吸引子，形成正反馈闭环
 
 这一机制在临床上有明确对应：抑郁患者的"反刍思维"（rumination）正是状态依赖参数演行的表现——低韧性状态→认知扭曲加剧→压力评估升高→韧性进一步降低。
@@ -231,44 +246,51 @@ V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\
 \end{aligned}
 $$
 
-这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 $\Delta V \rightarrow 0$ 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
+这是**首次**将 Scheffer 的定性韧性概念转化为可计算的定量指标。当 $\Delta V \to 0$ 时，系统接近临界转变——比任何基于训练的模型都能更准确地预测"突然崩溃"。
 
-### 创新点 4：Lazarus 理论约束的多步反思认知评价流（Theory-Guided Reflective Appraisal Chain）
+### 创新点 4：Lazarus 理论约束的混合认知评价架构——LLM 文本理解 + 算法临床推理（Hybrid Appraisal Architecture）
 
-**问题**：现有 LLM 心理健康应用缺乏心理学理论约束，输出不可控。简单的 prompt 模板无法保证推理的机制化深度。
+**问题**：现有 LLM 心理健康应用缺乏心理学理论约束，输出不可控。纯 LLM 方案存在幻觉、评分不稳定、理论一致性无法保证三大问题。
 
-**创新**：将 Lazarus 的认知评价树设计为 LLM 的多步反思推理流（Chain-of-Thought with Theory-guided Rollback），而非简单的单轮 prompt：
+**创新**：将 Lazarus 认知评价树设计为**LLM-算法混合架构**——LLM 仅负责文本理解（症状识别），算法负责临床推理（评分、一致性检验、参数映射），实现"各取所长"的分工：
 
 $$
 \begin{aligned}
-&\textbf{Step 1: Primary Appraisal Agent（初级评价智能体)} \\
-&\quad \text{输入}: \text{个体文本} \\
-&\quad \text{任务}: \text{识别威胁刺激} + \text{评估威胁程度} (1\text{-}10) \\
-&\quad \text{输出}: \{\texttt{threatType},\; \texttt{threatIntensity},\; \texttt{threatNarrative}\} \\
-&\textbf{Step 2: Secondary Appraisal Agent（次级评价智能体)} \\
-&\quad \text{输入}: \text{个体文本} + \text{Step 1 的威胁识别} \\
-&\quad \text{任务}: \text{评估应对资源} + \text{应对效能} (1\text{-}10) \\
-&\quad \text{输出}: \{\texttt{copingResources},\; \texttt{copingEfficacy},\; \texttt{resourceNarrative}\} \\
-&\textbf{Step 3: Reappraisal Agent（再评价智能体）— Theory-guided Rollback} \\
-&\quad \text{输入}: \text{Step 1} + \text{Step 2 的输出} \\
-&\quad \text{任务}: \text{检验初级/次级评价的一致性} \\
+&\textbf{Step 1: Primary Appraisal（初级评价）— LLM + 规则混合检测} \\
+&\quad \text{规则层}: \text{关键词扫描检测 PHQ-8 症状} \to \text{置信度 } 1.0 \\
+&\quad \text{LLM 层}: \text{零样本症状识别（二分类 yes/no）} \to \text{置信度 } 0.6 \\
+&\quad \text{融合}: \text{规则优先，LLM 补充} \to \text{置信度加权计数} \to \text{算法映射为威胁评分} (1\text{-}10) \\
+&\quad \text{输出}: \{\texttt{primaryScore},\; \texttt{threatType},\; \texttt{detectedSymptoms}\} \\
+&\textbf{Step 2: Secondary Appraisal（次级评价）— 算法计算} \\
+&\quad \text{输入}: \text{应对关键词扫描} + \text{风险关键词扫描} \\
+&\quad \text{算法}: \text{secondaryScore} = f(\text{copingScore},\; \text{riskScore},\; 11 - \text{primaryScore}) \\
+&\quad \text{输出}: \{\texttt{secondaryScore},\; \texttt{copingEfficacy},\; \texttt{socialSupport}\} \\
+&\textbf{Step 3: Reappraisal（再评价）— 算法一致性检验} \\
 &\quad \text{约束}: \text{Lazarus 理论要求 } \text{Stress} = f(\text{Primary} \times \text{Secondary}) \\
-&\quad \text{若 Primary 高但 Secondary 也高} \to \text{压力应低} \to \text{回滚修正} \\
-&\quad \text{若 Primary 低但 Secondary 也低} \to \text{潜在忽视} \to \text{回滚修正} \\
-&\quad \text{输出}: \{\texttt{reappraisalFlag},\; \texttt{correctedPrimary},\; \texttt{correctedSecondary}\} \\
-&\textbf{Step 4: Cognitive Distortion Agent（认知扭曲检测智能体)} \\
-&\quad \text{输入}: \text{修正后的评价} + \text{原始文本} \\
-&\quad \text{任务}: \text{基于 ABC 理论检测认知扭曲} \\
+&\quad \text{若 Primary 高但 Secondary 也高} \to \text{压力应低} \to \text{算法修正 Secondary} \\
+&\quad \text{若 Primary 低但 Secondary 也低} \to \text{潜在忽视} \to \text{算法修正 Primary} \\
+&\quad \text{输出}: \{\texttt{correctedPrimary},\; \texttt{correctedSecondary},\; \texttt{lazarusConsistency}\} \\
+&\textbf{Step 4: Cognitive Distortion Detection（认知扭曲检测）— 规则匹配} \\
+&\quad \text{方法}: \text{正则表达式匹配 5 类认知扭曲模式} \\
 &\quad \text{类型}: \text{灾难化} / \text{过度概括} / \text{非黑即白} / \text{情绪推理} / \text{个人化} \\
-&\quad \text{输出}: \{\texttt{distortionType},\; \texttt{distortionSeverity},\; \texttt{evidence}\} \\
-&\textbf{Step 5: Integration Agent（整合智能体)} \\
+&\quad \text{输出}: \{\texttt{distortionType},\; \texttt{severity},\; \texttt{evidence}\} \\
+&\textbf{Step 5: Integration（整合）— 算法参数映射} \\
 &\quad \text{输入}: \text{Step 1-4 的全部输出} \\
-&\quad \text{任务}: \text{计算 Cusp 参数代理值} \\
-&\quad \text{输出}: \{a_{\text{proxy}}(\text{威胁-应对差}),\; b_{\text{proxy}}(\text{应对×支持}),\; c_{\text{proxy}}(\text{支持×重评})\}
+&\quad a_{\text{proxy}} = (\text{primary} - \text{secondary}) / 10 \quad &\leftarrow \text{威胁-应对差} \\
+&\quad b_{\text{proxy}} = (\text{secondary} \times \text{social}) / 100 - 0.5 \quad &\leftarrow \text{应对×支持} \\
+&\quad c_{\text{proxy}} = \text{social} \times (11 - n_{\text{distortions}}) / 100 \quad &\leftarrow \text{支持×重评}
 \end{aligned}
 $$
 
-**关键创新**：Step 3 的 Theory-guided Rollback 机制确保 LLM 的推理**必须通过 Lazarus 理论的一致性检验**。如果 LLM 的输出违反了 $\text{Stress} = f(\text{Primary} \times \text{Secondary})$ 的理论约束（例如高威胁+高应对却输出高压力），系统会自动回滚并要求重新评估。这种机制化的理论约束远超简单的 prompt 模板，确保了输出的心理学理论一致性。
+**关键创新**：
+
+1. **LLM-算法分工**：LLM 仅负责其最擅长的文本理解（症状二分类），临床推理（评分、一致性检验、参数映射）全部由确定性算法完成。这解决了纯 LLM 方案的幻觉和评分不稳定问题——实验4证实，2B 模型直接评分准确率仅 17.5%，改为症状识别+算法映射后提升至 47.5%。
+
+2. **置信度加权融合**：规则检测（置信度 1.0）+ LLM 检测（置信度 0.6），规则优先、LLM 补充，确保高可靠性。
+
+3. **算法化 Lazarus 约束**：Step 3 的一致性检验由确定性算法执行，而非依赖 LLM 自我修正，保证理论约束的**不可违反性**——无论 LLM 输出什么，系统都会强制修正违反 Lazarus 理论的评分组合。
+
+4. **多层防护机制**：否定检测（过滤"I don't feel sad"）、应对关键词抑制（检测到积极应对时降权）、症状密度调节（低密度日常用语降权）、风险关键词提升（高风险词加权）。
 
 ### 创新点 5：Training-free 范式的理论优势——对训练数据三大问题的免疫
 
@@ -421,13 +443,12 @@ EWS韧性指标AUC=0.929（95%CI=[0.898, 0.957]），前瞻预测k=3步AUC=0.946
 
 #### 对比方法
 
-| 方法 | 理论约束 | 模型 |
-|------|---------|------|
-| 无约束零样本 LLM | 无 | Qwen3.5-2B |
-| **Lazarus 约束零样本 LLM** | **Lazarus 认知评价** | **Qwen3.5-2B** |
-| GPT-4 零样本 | 无 | GPT-4 |
-| GPT-4 零样本 | Lazarus 约束 | GPT-4 |
-| DepressLLM (微调) | 无 | 微调 LLaMA | Moon et al. (2025) |
+| 方法 | 理论约束 | 模型 | 状态 |
+|------|---------|------|------|
+| 无约束零样本 LLM | 无 | Qwen3.5-2B | ✅ 已完成 |
+| **Lazarus 约束零样本 LLM** | **Lazarus 认知评价** | **Qwen3.5-2B** | ✅ 已完成 |
+| GPT-4 零样本 | 无/Lazarus | GPT-4 | ⏳ 待完成（需API key） |
+| DepressLLM (微调) | 无 | 微调 LLaMA | ⏳ 待完成（需训练资源） |
 
 #### 评估指标
 
@@ -462,19 +483,19 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
   c_proxy = norm(MSPSS_proxy × LLM_extract("社会支持感知", text))
 ```
 
-其中 $\texttt{LLMExtract}$ 是 Lazarus 约束的零样本抽取函数（见 [Layer 3](#创新点-4lazarus-理论约束的多步反思认知评价流theory-guided-reflective-appraisal-chain) Step 3-5），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
+其中 $\texttt{LLMExtract}$ 是 Lazarus 约束的混合评价函数（见 [创新点 4](#创新点-4lazarus-理论约束的混合认知评价架构llm-文本理解--算法临床推理hybrid-appraisal-architecture) Step 1-5），从文本中同时提取威胁认知、应对效能和社会支持感知三个维度的评分。这确保 CuspNet 在**任何具备丰富文本的数据集上都能冷启动**，无需完整量表覆盖。
 
 > **验证方法**：在同时具备文本和量表的数据集（如自采数据）上，对比 LLM 代理参数与真实量表分数的相关性，确保代理有效性（预期 r > 0.4）。
 
 #### 对比系统
 
-| 系统 | 方法 | 是否需要训练 |
-|------|------|------------|
-| 问卷阈值法 | PHQ-9 ≥ 10 | 否 |
-| 随机森林 | 传统 ML | 是（需 500+ 标注样本） |
-| XGBoost | 传统 ML | 是（需 500+ 标注样本） |
-| DepressLLM | 微调 LLM | 是（需大量标注数据） |
-| **CuspNet** | **Training-free 因果-动力学** | **否** |
+| 系统 | 方法 | 是否需要训练 | 状态 |
+|------|------|------------|------|
+| 问卷阈值法 | PHQ-9 ≥ 10 | 否 | ✅ |
+| 随机森林 | 传统 ML | 是（需 500+ 标注样本） | ✅ |
+| XGBoost | 传统 ML | 是（需 500+ 标注样本） | ✅ |
+| DepressLLM | 微调 LLM | 是（需大量标注数据） | ⏳ 待完成 |
+| **CuspNet** | **Training-free 因果-动力学** | **否** | ✅ |
 
 > **注**：NHANES 样本量 10000+，足够训练随机森林/XGBoost 基线，确保 ML 对比公平。StudentLife 仅 48 人，不足以训练 ML 模型，因此仅保留用于纵向动力学验证（Exp 2-3），不用于端到端 ML 对比。
 
@@ -499,7 +520,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 | -Cusp | 用线性模型替代 Cusp ODE | Cusp 分岔模型的贡献 |
 | -A_embedding | 移除因果网络嵌入 ODE | 因果-动力学融合的贡献 |
 | -LLM | 移除 LLM 层 | 零样本推理的贡献 |
-| -Lazarus | 移除 Lazarus 多步反思流，改为单轮 prompt | 理论约束 LLM 反思流的贡献 |
+| -Lazarus | 移除 Lazarus 混合评价架构，改为纯 LLM 单轮 prompt | 理论约束混合架构的贡献 |
 
 ### 5.8 实验数据集获取方式汇总
 
@@ -676,7 +697,7 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 |------|---------|---------|------|
 | 因果拓扑排序算法 | SCORE | GES + BIC exact search | causal-learn 版本不含独立 SCORE API |
 | LLM 模型 | Qwen2.5-7B-Instruct | Qwen3.5-2B（本地） | 显存限制，2B模型可在消费级GPU本地运行 |
-| Reappraisal 步骤 | 确定性逻辑 | LLM生成 + 确定性约束 | 提供更灵活的反思能力，同时保证理论一致性 |
+| Reappraisal 步骤 | 纯算法一致性检验 | LLM生成 + 确定性约束 | 2B模型LLM生成不稳定，算法检验更可靠且理论约束不可违反 |
 | 4-bit 量化 | 默认开启 | 默认关闭 | 2B模型无需量化 |
 | NHANES PHQ标签 | 9个 | 10个（含functional_impairment） | 数据实际包含10列DPQ |
 | 韧性储备计算 | Cusp势函数ΔV | EWS指标（滚动方差+自相关） | 真实数据缺乏双稳态分岔，ΔV=inf |
@@ -774,7 +795,7 @@ mental-health-system/
 | 网络心理测量 | qgraph (via rpy2) | EBICglasso 偏相关网络估计 |
 | 连续优化基线 | NOTEARS | 连续优化因果发现基线 |
 | 动力学求解 | SciPy.integrate.solve_ivp | Cusp ODE 数值求解 (BDF方法) |
-| LLM 推理 | transformers (Qwen3.5-2B) | 零样本认知评价 |
+| LLM 推理 | transformers (Qwen3.5-2B) | 零样本症状识别（混合评价架构的文本理解层） |
 | 传统ML基线 | scikit-learn (RandomForest), XGBoost | 端到端预测基线对比 |
 | 数据处理 | NumPy, Pandas | 数据加载与预处理 |
 | 可视化 | Matplotlib, NetworkX | 因果图 + 势函数 + 热力图 |
@@ -786,9 +807,53 @@ mental-health-system/
 
 ---
 
-## 8. 快速开始
+## 8. 前端交互系统
 
-### 8.1 环境准备
+CuspNet 提供基于 React 19 + TypeScript 的可视化交互界面，支持实时参数调节、动力学可视化和三层架构的端到端演示。
+
+### 8.1 页面架构
+
+| 页面 | 路由 | 功能 |
+|------|------|------|
+| 首页 | `/` | 三层架构总览，展示 Layer 1/2/3 的核心指标与数据流 |
+| 核心架构 | `/architecture` | 三层详细可视化：因果网络图 + 势函数曲面 + Lazarus 评价流 |
+| 交互Demo | `/demo` | Cusp 势函数交互式探索，实时调节 a/b/c 参数观察分岔 |
+
+### 8.2 核心交互功能
+
+**首页（Home）**
+- 三层架构卡片：每层显示核心指标（特征提取 94%、动力学建模 87%、语义理解 85%）
+- 数据流管线可视化：症状问卷 → 因果网络 → Cusp 参数 → 抑郁等级
+- 技术栈概览：3 层融合 / CoVe+SC+RS / Qwen3.5-2B
+
+**核心架构页（Architecture）**
+- **Layer 1 因果发现**：ECharts 力导向图实时渲染因果 DAG，节点大小反映中心性，边宽度反映因果强度；支持后端 API 实时数据与本地默认数据双模式
+- **Layer 2 Cusp 动力学**：势函数 V(x) 实时绘制，标注健康态（绿色）、抑郁态（粉色）、鞍点（橙色）三个不动点；压力/韧性滑块可交互调节 Cusp 参数，实时观察双稳态→单稳态转变
+- **Layer 3 LLM 认知评估**：Lazarus 评价流可视化（Primary → Secondary → Reappraisal → Distortion），CoVe/Self-Critique/Risk-Sensitive 技术指标进度条
+
+**交互Demo页（Demo）**
+- 势函数 V(x) = ax⁴/4 + bx²/2 + cx 的实时交互：三个滑块分别控制 a（稳定性）、b（分岔参数）、c（不对称因子）
+- 分岔图同步渲染：稳定平衡态（绿色散点）与不稳定平衡态（粉色散点），当前 b 值黄色虚线标注
+- 动画模式：一键播放 b 从 -3 → +3 的连续演化，直观观察临界分岔过程
+- 快速预设：双稳态 / 单稳态 / 临界分岔 / 偏移双稳 四种典型场景一键切换
+- API/本地双模式：后端在线时使用真实 CuspNet 数据，离线时自动切换本地数值计算
+
+### 8.3 技术实现
+
+| 特性 | 实现 |
+|------|------|
+| 响应式缩放 | 基于 viewport 的动态 zoom 计算，适配不同屏幕 |
+| API 降级 | axios 请求后端 → 失败自动降级为前端本地数值计算 |
+| 可视化引擎 | ECharts 6（力导向图 + 折线图 + 散点图） |
+| UI 框架 | Ant Design 6 + 自定义暗色主题（Cyberpunk 风格） |
+| 状态管理 | Zustand + React useState（轻量级，无需全局 store） |
+| 字体 | Chakra Petch（显示字体）+ Inter（正文字体） |
+
+---
+
+## 9. 快速开始
+
+### 9.1 环境准备
 
 ```bash
 cd backend
@@ -811,7 +876,7 @@ pip install -r requirements.txt
 - 本地 LLM 模型：Qwen3.5-2B，需下载到本地路径（默认 `D:\Models\huggingface\Qwen3.5-2B`）
   - 可从 [HuggingFace](https://huggingface.co/Qwen) 下载模型文件
 
-### 8.2 数据集准备
+### 9.2 数据集准备
 
 原始数据集不包含在仓库中，需自行下载并放置到 `backend/app/data/raw/` 目录：
 
@@ -824,7 +889,7 @@ pip install -r requirements.txt
 
 > **注**：部分实验（如实验2、3）使用合成数据，无需额外下载。实验1的Sachs数据为公开学术数据。
 
-### 8.3 启动后端 API
+### 9.3 启动后端 API
 
 ```bash
 cd backend
@@ -833,7 +898,7 @@ uvicorn app.main:app --reload --port 8000
 
 API文档访问：http://localhost:8000/docs
 
-### 8.4 启动前端（可选）
+### 9.4 启动前端（可选）
 
 ```bash
 cd frontend
@@ -843,7 +908,7 @@ npm run dev
 
 前端访问：http://localhost:5173
 
-### 8.5 运行实验
+### 9.5 运行实验
 
 ```bash
 cd backend
@@ -868,7 +933,7 @@ python run_exp5.py
 
 ---
 
-## 9. 文献支撑
+## 10. 文献支撑
 
 ### 心理学理论文献
 
@@ -927,7 +992,7 @@ python run_exp5.py
 
 ---
 
-## 10. 开发日志
+## 11. 开发日志
 
 ### 2026-06-02：五个实验全部完成，项目核心验证闭环
 
