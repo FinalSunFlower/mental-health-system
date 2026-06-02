@@ -91,11 +91,11 @@ $$
 | Symbol | Meaning | Operationalization |
 |--------|---------|-------------------|
 | $x$ | Mental state variable (standardized composite index) | PHQ-9 + GAD-7 weighted composite |
-| $a$ | Asymmetry factor (stressor − protective factor) | $\mathrm{norm}(\mathrm{PSS\text{-}10}) - \mathrm{norm}(\mathrm{CD\text{-}RISC})$ |
-| $b$ | Bifurcation factor (resilience reserve × self-regulation) | $\mathrm{norm}(\mathrm{CD\text{-}RISC}) \times \mathrm{norm}(\mathrm{MSPSS}) - \theta_{\mathrm{bif}}$ |
-| $c$ | Self-regulation strength (social support × cognitive reappraisal) | $\mathrm{norm}(\mathrm{MSPSS}) \times \mathrm{norm}(\mathrm{cog\text{-}reappraisal})$ |
+| $a$ | Asymmetry factor (stressor − protective factor) | norm(PSS-10) − norm(CD-RISC) |
+| $b$ | Bifurcation factor (resilience reserve × self-regulation) | norm(CD-RISC) × norm(MSPSS) − θ_bif |
+| $c$ | Self-regulation strength (social support × cognitive reappraisal) | norm(MSPSS) × norm(cognitive reappraisal score) |
 
-**Theoretical prediction**: When resilience reserve ($b$) drops below critical threshold $\theta_{\text{bifurcation}}$, the system undergoes **bifurcation** — small stress changes can trigger state collapse (depression onset).
+**Theoretical prediction**: When resilience reserve (b) drops below critical threshold θ_bifurcation, the system undergoes **bifurcation** — small stress changes can trigger state collapse (depression onset).
 
 #### Individualized Cusp Parameters
 
@@ -107,7 +107,7 @@ c_i &= c \cdot (1 + \lambda_3 \cdot \mathrm{bridge}_i)      &&\leftarrow \text{B
 \end{aligned}
 $$
 
-Where $\mathrm{centrality}_i$ is symptom $i$'s expected influence centrality (from Layer 1 Step 1.4), $\mathrm{bridge}_i$ is bridge centrality, and $\lambda_1, \lambda_2, \lambda_3$ are allocation coefficients (obtained from data via moment estimation, no gradient training required).
+Where **centrality_i** is symptom i's expected influence centrality (from Layer 1 Step 1.4), **bridge_i** is bridge centrality, and λ₁, λ₂, λ₃ are allocation coefficients (obtained from data via moment estimation, no gradient training required).
 
 **Psychological basis**: High-centrality symptoms (e.g., "insomnia") are both the primary entry point for stress ($a_i$ larger) and the most fragile link for resilience collapse ($b_i$ smaller). This aligns with Borsboom (2017)'s core argument — "central symptoms are key hubs maintaining the pathological network structure."
 
@@ -130,30 +130,11 @@ $$
 
 ## 3. CuspNet Complete Architecture
 
-### 3.1 Three-Layer Closed-Loop Pipeline
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    CuspNet Architecture                      │
-│                                                             │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐              │
-│  │ Layer 1  │    │ Layer 2  │    │ Layer 3  │              │
-│  │ Causal   │───▶│ Dynamics │───▶│ Cognitive│              │
-│  │ Discovery│    │ Modeling │    │ Appraisal│              │
-│  └──────────┘    └──────────┘    └────┬─────┘              │
-│       │               │               │                    │
-│       ▼               ▼               ▼                    │
-│   Causal Adj      Cusp ODE        a,b,c Proxy              │
-│   Matrix (A)      Parameters     (LLM+Algorithm)           │
-│       │               ▲               │                    │
-│       └───────────────┴───────────────┘                    │
-│                   Closed-loop feedback                       │
-└─────────────────────────────────────────────────────────────┘
-```
+![CuspNet Architecture](backend/app/docs/earchitecture.png)
 
 ### 3.2 Four-Formula Closed Loop
 
-> **Four-formula closed loop**: Network Structure $(\mathbf{A})$ → Dynamics(ODE) → Attractor $(\Delta V)$ → Cognitive Appraisal $(a)$ → Network Structure
+> **Four-formula closed loop**: Network Structure (A) → Dynamics(ODE) → Attractor (ΔV) → Cognitive Appraisal (a) → Network Structure
 
 **Dynamical explanation of the key closed-loop step**: ΔV → a is not a simple direct mapping, but is based on a **State-dependent Parameter Drift** mechanism:
 
@@ -250,7 +231,7 @@ V(x) &= -ax - \frac{b}{2}x^2 + \frac{c}{4}x^4 \\
 \end{aligned}
 $$
 
-This is the **first** transformation of Scheffer's qualitative resilience concept into a computable quantitative indicator. When $\Delta V \to 0$, the system approaches critical transition — predicting "sudden collapse" more accurately than any training-based model.
+This is the **first** transformation of Scheffer's qualitative resilience concept into a computable quantitative indicator. When ΔV → 0, the system approaches critical transition — predicting "sudden collapse" more accurately than any training-based model.
 
 **Validation on StudentLife dataset**:
 - EWS (Early Warning Signal) AUC=0.929
@@ -326,7 +307,7 @@ $$
 | Exp 1: Causal Discovery | Sachs Protein Network | SID, F1, SHD | SID=4, F1=0.73 ✅ |
 | Exp 2: Cusp Fitting | Emotional Dynamics | AIC/BIC, Pseudo-R², Accuracy | AIC=-8881, R²=0.856, Acc=100% ✅ |
 | Exp 3: Resilience Prediction | StudentLife | EWS AUC, Prospective AUC | 0.929 / 0.946 ✅ |
-| Exp 4: LLM Appraisal | Reddit Depression Posts | Composite Score Correlation | r=0.82 (vs expert) ✅ |
+| Exp 4: LLM Appraisal | eRisk Dataset | Kappa (Lazarus-constrained) | 0.236 (+72% vs unconstrained) ✅ |
 | Exp 5: End-to-End Prediction | NHANES | AUC-ROC, Recall | AUC=0.857, Recall=0.787 ✅ |
 
 **Comparison with baselines** (Experiment 5):
@@ -360,7 +341,7 @@ To ensure reproducibility and avoid data access barriers, all experiments use pu
 | Sachs Protein Network | Sachs et al. (2005) | Public | 11 variables, 853 observations |
 | Emotional Dynamics | Kossakowski et al. (2017) | Public | 1 subject, 239 days |
 | StudentLife | Wang et al. (2014) | Dartmouth open source | 48 students, 10 weeks |
-| Reddit Depression Posts | Reddit API (self-collected) | API access | 200 posts |
+| eRisk | CLEF | [Official application](https://early.irlab.org/) | **Agreement signature required** |
 | NHANES | CDC public database | Free download | 5073 subjects |
 
 ### 5.2 Experiment 1: Theory-Constrained Causal Discovery (Validates Innovation 1)
@@ -380,13 +361,14 @@ To ensure reproducibility and avoid data access barriers, all experiments use pu
 **Results**:
 | Method | SID ↓ | F1 ↑ | Structural Hamming Distance ↓ |
 |--------|-------|------|-------------------------------|
-| PC Algorithm | 14 | 0.42 | 18 |
-| NOTEARS | 14 | 0.45 | 16 |
-| GES (pure data) | 12 | 0.51 | 11 |
-| **GES × EBICglasso × Borsboom** | **4** | **0.73** | **3** |
+| PC Algorithm | 14 | 0.143 | 18 |
+| NOTEARS | 14 | 0.222 | 16 |
+| GES (pure data) | 12 | 0.143 | 11 |
+| **GES × EBICglasso × Borsboom** | **4** | **0.846** | **3** |
 
 **Key findings**:
-- SID=4 (significantly lower than PC/GES's 12 and NOTEARS's 14), indicating more accurate causal direction inference
+- CuspNet F1=0.846, 5.9× PC/GES, 3.8× NOTEARS
+- SID=4 (far below baselines' 12-14), most accurate causal direction inference
 - Identified 5 bridge symptoms: Akt, PKA, PIP3, PKC, Raf
 - **Conclusion**: Theory-constrained causal discovery (GES × EBICglasso × Borsboom constraints) significantly outperforms pure data-driven methods on this dataset
 
@@ -400,7 +382,7 @@ To ensure reproducibility and avoid data access barriers, all experiments use pu
 | Model | Equation | Type |
 |-------|----------|------|
 | Linear regression | $x = \beta_0 + \beta_1 a + \beta_2 b$ | Linear |
-| Logistic regression | $P(\mathrm{risk}) = \sigma(\beta_0 + \beta_1 a + \beta_2 b)$ | Generalized linear |
+| Logistic regression | P(risk) = σ(β₀ + β₁a + β₂b) | Generalized linear |
 | Cusp model | $\frac{dx}{dt} = a + bx - cx^3$ | Nonlinear dynamics |
 
 **Actual results**:
@@ -423,42 +405,43 @@ Cusp model significantly outperforms baseline models on AIC/BIC (ΔAIC>2400), Ps
 **Methodology**:
 1. Extract daily PSS-10 (stress) and CD-RISC (resilience) scores
 2. Compute time-varying Cusp parameters $a(t)$, $b(t)$
-3. Calculate resilience reserve $\Delta V(t) = V(x_{\text{saddle}}) - V(x_{\text{healthy}})$
-4. Test whether $\Delta V$ decline predicts subsequent PHQ-9 elevation
+3. Calculate resilience reserve ΔV(t) = V(x_saddle) − V(x_healthy)
+4. Test whether ΔV decline predicts subsequent PHQ-9 elevation
 
 **Results**:
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
-| EWS AUC (Early Warning Signal) | **0.929** | Resilience decline predicts state transition |
-| Prospective AUC (2-week lead) | **0.946** | 2-week advance warning possible |
-| Lead time before PHQ-9 spike | **~14 days** | Sufficient for preventive intervention |
+| EWS AUC (Early Warning Signal) | **0.929**, 95%CI=[0.898, 0.957] | Resilience decline predicts state transition |
+| Prospective AUC (k=3 steps) | **0.946** | Multi-step advance warning possible |
+| Cox regression | p<0.000001, HR=0.012 | Statistically significant predictor |
+| Pre-tipping resilience | 0.572 | Significantly lower than overall (0.887) |
 
 **Clinical implication**: If ΔV continuously declines for >7 days, trigger early warning — this is earlier than traditional PHQ-9 threshold-based screening.
 
 ### 5.5 Experiment 4: LLM Cognitive Appraisal Quality (Validates Innovation 4)
 
-**Dataset**: 200 Reddit depression-related posts (self-collected via Reddit API)
+**Dataset**: eRisk (CLEF early risk prediction challenge, Reddit depression-related posts)
 
 **Objective**: Verify whether LLM-algorithm hybrid approach produces clinically meaningful appraisals
 
 **Evaluation methodology**:
-- Expert annotation: 2 clinical psychology PhD students independently score each post on Primary Appraisal (1-10), Secondary Appraisal (1-10), and distortion type/severity
-- Compare CuspNet output with expert consensus (ICC > 0.8 as gold standard)
+- Compare Lazarus-constrained vs unconstrained LLM output
+- Track accuracy improvement across 7 iterations of architectural optimization
 
 **Results**:
-| Component | Correlation with Experts | Clinical Acceptability |
-|-----------|--------------------------|----------------------|
-| Primary Appraisal (threat score) | r = 0.87 | ✅ High agreement |
-| Secondary Appraisal (coping score) | r = 0.79 | ✅ Moderate-high agreement |
-| Cognitive Distortion Detection | Precision=0.81, Recall=0.74 | ✅ Clinically useful |
-| Lazarus Consistency Check | 94% pass rate | ✅ Theoretical compliance |
-| Composite Score | r = 0.82 | ✅ Strong overall correlation |
+
+| Metric | Lazarus-Constrained | Unconstrained LLM | Improvement |
+|--------|-------------------|-------------------|-------------|
+| Cohen's Kappa | 0.236 | 0.138 | +72% |
+| V1 Accuracy (direct scoring) | 17.5% | — | Baseline |
+| V7 Accuracy (symptom ID + algorithm) | 47.5% | — | +171% |
 
 **Key technical achievements**:
-- Temperature reduction from 0.3→0.1 stabilizes LLM output
-- Rule-LLM confidence-weighted fusion eliminates binary detection fluctuation
-- Algorithmic consistency check enforces Lazarus theoretical constraints
-- Regex-based distortion detection avoids LLM over-interpretation
+- After 7 iterations of optimization, accuracy improved from V1 17.5% to V7 47.5%
+- Key architectural improvement: LLM task changed from "direct scoring" to "symptom identification + algorithm mapping"
+- Confidence-weighted fusion (rule confidence 1.0 + LLM confidence 0.6), rule-priority, LLM-supplementary
+- Negation detection, coping keyword suppression, symptom density modulation, risk keyword boosting
+- Approaching ceiling under 2B model zero-shot settings
 
 ### 5.6 Experiment 5: End-to-End Predictive Validation (Validates Innovation 5)
 
@@ -501,7 +484,7 @@ Cusp model significantly outperforms baseline models on AIC/BIC (ΔAIC>2400), Ps
 | 1 | Causal Discovery (Sachs) | ✅ Completed | SID=4, F1=0.73, SHD=3 | Ground truth comparison |
 | 2 | Cusp Fitting (Emotional Dynamics) | ✅ Completed | AIC=-8881, R²=0.856, Acc=100% | AIC/BIC/CV comparison |
 | 3 | Resilience Prediction (StudentLife) | ✅ Completed | EWS AUC=0.929, Prospective AUC=0.946 | Time-series prospective validation |
-| 4 | LLM Appraisal (Reddit) | ✅ Completed | Composite r=0.82 vs experts | Expert ICC benchmark |
+| 4 | LLM Appraisal (eRisk) | ✅ Completed | Kappa 0.236 (+72%) | V1→V7 accuracy 17.5%→47.5% |
 | 5 | End-to-End (NHANES) | ✅ Completed | AUC=0.857, Recall=0.787 | 3-fold CV + DeLong test |
 
 ### Detailed Results Summary
@@ -543,72 +526,109 @@ Cusp model significantly outperforms baseline models on AIC/BIC (ΔAIC>2400), Ps
 
 ```
 mental-health-system/
-├── backend/
-│   ├── app/
-│   │   ├── main.py                 # FastAPI application entry
-│   │   ├── api/                    # API route definitions
-│   │   │   ├── assess.py           # Assessment endpoint
-│   │   │   └── visualization.py    # Visualization endpoint
-│   │   ├── core/                   # Core algorithms
-│   │   │   ├── causal_discovery.py # Layer 1: EBICglasso + GES
-│   │   │   ├── cusp_dynamics.py    # Layer 2: Cusp ODE solver
-│   │   │   └── llm_appraisal.py    # Layer 3: LLM-Algorithm hybrid
-│   │   ├── models/                 # Pydantic data models
-│   │   ├── services/               # Business logic services
-│   │   └── utils/                  # Utility functions
-│   ├── data/                       # Data storage
-│   │   ├── raw/                    # Original data (not committed)
-│   │   └── processed/              # Processed data
-│   ├── tests/                      # Test suite
-│   ├── experiments/                # Experiment scripts
-│   │   ├── exp1_causal.py
-│   │   ├── exp2_cusp_fitting.py
-│   │   ├── exp3_resilience.py
-│   │   ├── exp4_llm_appraisal.py
-│   │   └── exp5_end_to_end.py
-│   ├── requirements.txt            # Python dependencies
-│   └── README.md                   # Backend documentation
-├── frontend/
-│   ├── src/
-│   │   ├── pages/                  # Page components
-│   │   │   ├── Home.tsx           # Homepage (three-layer overview)
-│   │   │   ├── Architecture.tsx   # Detailed architecture visualization
-│   │   │   └── Demo.tsx           # Interactive Cusp demo
-│   │   ├── components/             # Shared components
-│   │   │   └── Layout/
-│   │   │       └── MainLayout.tsx # Main layout with navigation
-│   │   ├── services/               # API service layer
-│   │   │   └── api.ts             # Axios API configuration
-│   │   ├── App.tsx                # Root component with routing
-│   │   └── main.tsx               # Entry point
-│   ├── package.json                # Frontend dependencies
-│   ├── vite.config.ts             # Vite configuration
-│   └── tsconfig.json              # TypeScript configuration
-├── LICENSE                         # MIT License
-└── README.md                       # This file
+├── README.md                            # Project documentation (Chinese)
+├── README.en.md                         # English version
+├── LICENSE                              # MIT License
+├── .gitignore                           # Git ignore rules (dataset exclusion)
+│
+└── backend/
+    ├── .env                             # Environment variables (not uploaded)
+    ├── requirements.txt                 # Python dependencies
+    ├── run_exp1.py                      # Experiment 1 entry
+    ├── run_exp2.py                      # Experiment 2 entry
+    ├── run_exp3.py                      # Experiment 3 entry
+    ├── run_exp4.py                      # Experiment 4 entry
+    ├── run_exp5.py                      # Experiment 5 entry
+    │
+    └── app/
+        ├── __init__.py
+        ├── main.py                      # FastAPI entry + API routes
+        │
+        ├── core/                        # Infrastructure layer
+        │   ├── __init__.py
+        │   ├── config.py                # Global config (Settings)
+        │   ├── database.py              # SQLAlchemy engine + session
+        │   ├── models.py                # ORM models (User, Student, CuspNetRecord)
+        │   └── schemas.py               # Pydantic request/response models
+        │
+        ├── cuspnet/                     # ★ Core three-layer architecture
+        │   ├── __init__.py
+        │   ├── utils.py                 # Pure math utility functions
+        │   ├── statistics.py            # Statistical testing utilities
+        │   ├── layer1_causal.py         # Layer 1: Causal network discovery
+        │   ├── layer2_dynamics.py       # Layer 2: Cusp bifurcation dynamics
+        │   ├── layer3_llm.py            # Layer 3: Multi-step reflective LLM
+        │   └── cuspnet_engine.py        # Three-layer fusion engine
+        │
+        ├── visualization/               # Visualization
+        │   ├── causal_graph_vis.py      # Causal DAG graph
+        │   ├── potential_vis.py         # Potential function surface
+        │   └── network_vis.py           # Centrality heatmap
+        │
+        ├── data/                        # Data pipeline
+        │   ├── __init__.py
+        │   ├── loaders.py               # 6 dataset loaders (Sachs, NHANES, Kossakowski, DAIC-WOZ, StudentLife, eRisk)
+        │   ├── preprocess.py            # Normalization + missing values + CUSP parameter extraction
+        │   ├── synthetic.py             # Cusp ODE synthetic data generation
+        │   └── raw/                     # ⚠️ Raw datasets (not uploaded, see §9.2)
+        │       ├── sachs_data.csv       #   Sachs protein network
+        │       ├── DPQ_J.XPT            #   NHANES DPQ raw
+        │       ├── nhanes_dpq.csv       #   NHANES DPQ derived
+        │       ├── daic_woz/            #   DAIC-WOZ interview transcripts (30 folders)
+        │       └── erisk/               #   eRisk Reddit posts (hundreds of JSONs)
+        │
+        └── experiments/                 # Experiment scripts
+            ├── __init__.py
+            ├── exp1_causal_discovery.py
+            ├── exp2_cusp_fitting.py
+            ├── exp3_resilience_prediction.py
+            ├── exp4_llm_appraisal.py
+            ├── exp5_end_to_end.py
+            ├── ablation_study.py
+            └── baselines/
+                ├── __init__.py
+                ├── pc_algorithm.py
+                ├── ges_algorithm.py
+                ├── notears_baseline.py
+                └── ml_baselines.py
+│
+└── frontend/                           # Frontend (React + TypeScript)
+    ├── src/
+    │   ├── pages/
+    │   │   ├── Home.tsx                # Homepage
+    │   │   ├── Demo.tsx                # Demo page
+    │   │   └── Architecture.tsx        # Architecture page
+    │   ├── services/
+    │   │   └── api.ts                  # Backend API calls
+    │   └── App.tsx                     # Route configuration
+    ├── package.json
+    └── vite.config.ts
 ```
 
 ### Tech Stack
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
-| **Backend Framework** | FastAPI | RESTful API service |
-| **Causal Discovery** | pcalg (Python) | PC, GES, NOTEARS algorithms |
-| **Graphical Lasso** | sklearn + custom EBICglasso | Precision matrix estimation |
-| **ODE Solver** | scipy.integrate | Cusp differential equation solving |
-| **LLM** | Qwen3.5-2B (local deployment) | Zero-shot cognitive appraisal |
-| **Data Processing** | pandas, numpy | Data cleaning and transformation |
-| **Frontend Framework** | React 19 + TypeScript | SPA application |
-| **Build Tool** | Vite | Development and build |
-| **UI Library** | Ant Design 6 | Component library |
-| **Visualization** | ECharts | Data visualization display |
-| **State Management** | Zustand | Frontend state management |
+| **Backend Framework** | FastAPI + SQLAlchemy + Pydantic | API service + ORM + data validation |
+| **Causal Discovery** | causal-learn (GES, PC, BIC exact search) | Causal topology ordering + baseline comparison |
+| **Network Psychometrics** | qgraph (via rpy2) | EBICglasso partial correlation network estimation |
+| **Continuous Optimization Baseline** | NOTEARS | Continuous optimization causal discovery baseline |
+| **ODE Solver** | scipy.integrate.solve_ivp | Cusp ODE numerical solving (BDF method) |
+| **LLM** | transformers (Qwen3.5-2B) | Zero-shot symptom recognition (text understanding layer of hybrid appraisal) |
+| **Traditional ML Baselines** | scikit-learn (RandomForest), XGBoost | End-to-end prediction baseline comparison |
+| **Data Processing** | NumPy, Pandas | Data loading and preprocessing |
+| **Visualization** | Matplotlib, NetworkX | Causal graph + potential function + heatmap |
+| **Database** | SQLite (development) | Data persistence |
 
 ---
 
 ## 8. Frontend Interactive System
 
 CuspNet provides a visual interactive interface based on React 19 + TypeScript, supporting real-time parameter adjustment, dynamic visualization, and end-to-end demonstration of the three-layer architecture.
+
+**Home** | **Architecture** | **Interactive Demo**
+:---:|:---:|:---:
+![Home](backend/app/docs/1.png) | ![Architecture](backend/app/docs/2.png) | ![Demo](backend/app/docs/3.png)
 
 ### 8.1 Page Architecture
 
@@ -665,20 +685,27 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> **Note**: Some experiments (e.g., Experiments 2, 3) use synthetic data and do not require additional download. Experiment 1's Sachs data is publicly available academic data.
+**Additional dependencies**:
+- R (≥4.4): EBICglasso requires R's `qgraph` package, installed and called via `rpy2`
+  ```r
+  install.packages("qgraph")
+  install.packages("glasso")
+  ```
+- Local LLM model: Qwen3.5-2B, download to local path (default `D:\Models\huggingface\Qwen3.5-2B`)
+  - Available from [HuggingFace](https://huggingface.co/Qwen)
 
 ### 9.2 Dataset Preparation
 
 Original datasets are NOT included in the repository and must be downloaded and placed in `backend/app/data/raw/` directory:
 
-| Dataset | Download Location | Placement Path |
-|---------|-------------------|---------------|
-| Sachs | [Repository](https://github.com/bd2kccd/py-causal) | `raw/sachs/sachs.data` |
-| Emotional Dynamics | [Figshare](https://figshare.com/articles/dataset/) | `raw/emotional_dynamics/` |
-| StudentLife | [Dartmouth](http://studentlife.cs.dartmouth.edu/) | `raw/studentlife/` |
-| NHANES | [CDC](https://wwwn.cdc.gov/nchs/nhanes/) | `raw/nhanes/` |
+| Dataset | Placement Path | Access Method |
+|---------|---------------|---------------|
+| Sachs | `raw/sachs_data.csv` | [Science 2005](https://www.science.org/doi/10.1126/science.1105809) |
+| NHANES | `raw/DPQ_J.XPT` + `raw/nhanes_dpq.csv` | [CDC NHANES](https://wwwn.cdc.gov/nchs/nhanes/) |
+| DAIC-WOZ | `raw/daic_woz/` (30 `*_P/` folders) | [USC](http://dcapswoz.ict.usc.edu/) requires application |
+| eRisk | `raw/erisk/all_combined/` (hundreds of JSONs) | [CLEF](https://early.irlab.org/) |
 
-> **Note**: DAIC-WOZ requires academic application and must NOT be distributed with the codebase. eRisk requires protocol signing. See §13 for details.
+> **Note**: Some experiments (e.g., Experiments 2, 3) use synthetic data and do not require additional download. Experiment 1's Sachs data is publicly available academic data.
 
 ### 9.3 Start Backend API
 
@@ -702,23 +729,25 @@ Frontend access: http://localhost:5173
 ### 9.5 Run Experiments
 
 ```bash
-cd backend/experiments
+cd backend
 
-# Experiment 1: Causal discovery validation
-python exp1_causal.py
+# Experiment 1: Causal discovery (Sachs dataset)
+python run_exp1.py
 
-# Experiment 2: Cusp model fitting
-python exp2_cusp_fitting.py
+# Experiment 2: Cusp fitting (StudentLife longitudinal data)
+python run_exp2.py
 
-# Experiment 3: Resilience prediction
-python exp3_resilience.py
+# Experiment 3: Resilience prediction & early warning signals (StudentLife longitudinal data)
+python run_exp3.py
 
-# Experiment 4: LLM cognitive appraisal
-python exp4_llm_appraisal.py
+# Experiment 4: LLM appraisal chain (eRisk dataset + Qwen3.5-2B)
+python run_exp4.py
 
-# Experiment 5: End-to-end prediction
-python exp5_end_to_end.py
+# Experiment 5: End-to-end depression prediction (NHANES dataset)
+python run_exp5.py
 ```
+
+> **Note**: Ablation study code is implemented but not yet independently run.
 
 ---
 
@@ -760,9 +789,9 @@ python exp5_end_to_end.py
 **Overall progress**: ✅ All 5 experiments completed, full validation loop achieved
 
 1. **Experiment 1 (Causal Discovery)** ✅ Final version
-   - Theory-constrained method SID=4 (vs PC=14, GES=12, NOTEARS=14)
-   - F1=0.73, significantly outperforming pure data-driven approaches
-   - Successfully identified 5 biologically meaningful bridge symptoms
+   - CuspNet F1=0.846 on Sachs dataset, 5.9× PC/GES, 3.8× NOTEARS
+   - SID=4 (far below baselines' 12-14), most accurate causal direction inference
+   - Identified 5 bridge symptoms: Akt, PKA, PIP3, PKC, Raf
 
 2. **Experiment 2 (Cusp Fitting)** ✅ Final version
    - Cusp AIC=-8881, ΔAIC>2400 (vs linear/logistic), significant advantage
@@ -771,15 +800,17 @@ python exp5_end_to_end.py
    - Cusp dynamics CV MAE=0.006 (linear 0.083)
 
 3. **Experiment 3 (Resilience Prediction)** ✅ Final version
-   - EWS AUC=0.929, prospective AUC=0.946
-   - ~14 day advance warning before PHQ-9 spike
-   - Resilience decline precedes symptom elevation by ~2 weeks
+   - EWS resilience AUC=0.929, 95%CI=[0.898, 0.957]
+   - Prospective prediction k=3 steps AUC=0.946
+   - Cox regression p<0.000001, HR=0.012
+   - Pre-tipping resilience (0.572) significantly lower than overall (0.887)
 
 4. **Experiment 4 (LLM Appraisal)** ✅ Final version
-   - Primary Appraisal r=0.87, Secondary r=0.79 (vs expert consensus)
-   - Composite Score r=0.82
-   - Lazarus consistency 94% pass rate
-   - Distortion detection Precision=0.81, Recall=0.74
+   - Lazarus-constrained vs unconstrained LLM: Kappa 0.236 vs 0.138 (+72%)
+   - After 7 iterations of optimization, accuracy improved from V1 17.5% to V7 47.5%
+   - Key architectural improvement: LLM task changed from "direct scoring" to "symptom identification + algorithm mapping"
+   - Confidence-weighted fusion, negation detection, coping suppression, density modulation, and other generalizable optimizations
+   - Approaching ceiling under 2B model zero-shot settings
 
 5. **Experiment 5 (End-to-End Prediction)** ✅ Final version
    - CuspNet AUC=0.857, leading all baseline methods
@@ -812,9 +843,8 @@ This project is licensed under the [MIT License](LICENSE).
 |---------|-----------------|---------------|-------------------|
 | Sachs Protein Network | Sachs et al. (2005) | Public academic data | Must cite original paper |
 | DAIC-WOZ | USC/CMU | [Official application](https://dcapsule.com/daic-woz/) | **DUA signature required** |
-| eRisk | JHU | [Official application](https://erisk.2021.taln.upf.es/) | **Agreement signature required** |
+| eRisk | CLEF | [Official application](https://early.irlab.org/) | **Agreement signature required** |
 | NHANES | CDC | [Public download](https://wwwn.cdc.gov/nchs/nhanes/) | Public domain |
-| Reddit Self-Collected | Reddit API | Apply for own API key | Comply with ToS |
 
 ### Disclaimer
 

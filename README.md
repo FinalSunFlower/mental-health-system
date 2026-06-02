@@ -164,7 +164,7 @@ $$
 
 ## 3. CuspNet 完整架构
 
-![CuspNet 完整架构](backend/app/docs/architecture.png)
+![CuspNet 完整架构](backend/app/docs/carchitecture.png)
 
 ### 3.1 理论-算法共构闭环
 
@@ -725,7 +725,8 @@ CuspNet 引入**LLM 代理变量抽取**机制解决此问题：当缺乏标准�
 ```
 mental-health-system/
 ├── README.md                            # 项目说明（本文件）
-├── ARCHITECTURE.md                      # 架构详细文档
+├── README.en.md                         # English version
+├── LICENSE                              # MIT 开源许可
 ├── .gitignore                           # Git忽略规则（含数据集排除）
 │
 └── backend/
@@ -742,13 +743,16 @@ mental-health-system/
         ├── main.py                      # FastAPI 入口 + API 路由
         │
         ├── core/                        # 基础设施层
+        │   ├── __init__.py
         │   ├── config.py                # 全局配置常量 (Settings)
         │   ├── database.py              # SQLAlchemy 引擎 + 会话
         │   ├── models.py                # ORM 模型 (User, Student, CuspNetRecord)
         │   └── schemas.py               # Pydantic 请求/响应模型
         │
         ├── cuspnet/                     # ★ 核心三层架构
+        │   ├── __init__.py
         │   ├── utils.py                 # 纯数学工具函数
+        │   ├── statistics.py            # 统计检验工具
         │   ├── layer1_causal.py         # Layer 1: 因果网络发现
         │   ├── layer2_dynamics.py       # Layer 2: Cusp 分岔动力学
         │   ├── layer3_llm.py            # Layer 3: 多步反思 LLM
@@ -760,6 +764,7 @@ mental-health-system/
         │   └── network_vis.py           # 中心性热力图
         │
         ├── data/                        # 数据管道
+        │   ├── __init__.py
         │   ├── loaders.py               # 6个数据集加载器（Sachs, NHANES, Kossakowski, DAIC-WOZ, StudentLife, eRisk）
         │   ├── preprocess.py            # 标准化 + 缺失值处理 + CUSP参数提取
         │   ├── synthetic.py             # Cusp ODE 合成数据生成（用于验证实验）
@@ -771,6 +776,7 @@ mental-health-system/
         │       └── erisk/               #   eRisk Reddit帖子（数百个JSON）
         │
         └── experiments/                 # 实验脚本
+            ├── __init__.py
             ├── exp1_causal_discovery.py
             ├── exp2_cusp_fitting.py
             ├── exp3_resilience_prediction.py
@@ -778,6 +784,7 @@ mental-health-system/
             ├── exp5_end_to_end.py
             ├── ablation_study.py
             └── baselines/
+                ├── __init__.py
                 ├── pc_algorithm.py
                 ├── ges_algorithm.py
                 ├── notears_baseline.py
@@ -822,6 +829,10 @@ mental-health-system/
 ## 8. 前端交互系统
 
 CuspNet 提供基于 React 19 + TypeScript 的可视化交互界面，支持实时参数调节、动力学可视化和三层架构的端到端演示。
+
+**首页** | **核心架构** | **交互Demo**
+:---:|:---:|:---:
+![首页](backend/app/docs/1.png) | ![核心架构](backend/app/docs/2.png) | ![交互Demo](backend/app/docs/3.png)
 
 ### 8.1 页面架构
 
