@@ -304,7 +304,7 @@ $$
 
 | Experiment | Dataset | Target Metric | Result |
 |------------|---------|---------------|--------|
-| Exp 1: Causal Discovery | Sachs Protein Network | SID, F1, SHD | SID=4, F1=0.73 ✅ |
+| Exp 1: Causal Discovery | Sachs Protein Network | SID, F1, SHD | SID=4, F1=0.846 ✅ |
 | Exp 2: Cusp Fitting | Emotional Dynamics | AIC/BIC, Pseudo-R², Accuracy | AIC=-8881, R²=0.856, Acc=100% ✅ |
 | Exp 3: Resilience Prediction | StudentLife | EWS AUC, Prospective AUC | 0.929 / 0.946 ✅ |
 | Exp 4: LLM Appraisal | eRisk Dataset | Kappa (Lazarus-constrained) | 0.236 (+72% vs unconstrained) ✅ |
@@ -481,7 +481,7 @@ Cusp model significantly outperforms baseline models on AIC/BIC (ΔAIC>2400), Ps
 
 | # | Experiment | Status | Core Result | Validation Level |
 |---|-----------|--------|-------------|------------------|
-| 1 | Causal Discovery (Sachs) | ✅ Completed | SID=4, F1=0.73, SHD=3 | Ground truth comparison |
+| 1 | Causal Discovery (Sachs) | ✅ Completed | SID=4, F1=0.846, SHD=3 | Ground truth comparison |
 | 2 | Cusp Fitting (Emotional Dynamics) | ✅ Completed | AIC=-8881, R²=0.856, Acc=100% | AIC/BIC/CV comparison |
 | 3 | Resilience Prediction (StudentLife) | ✅ Completed | EWS AUC=0.929, Prospective AUC=0.946 | Time-series prospective validation |
 | 4 | LLM Appraisal (eRisk) | ✅ Completed | Kappa 0.236 (+72%) | V1→V7 accuracy 17.5%→47.5% |
@@ -491,7 +491,7 @@ Cusp model significantly outperforms baseline models on AIC/BIC (ΔAIC>2400), Ps
 
 **Experiment 1 (Causal Discovery)** ✅
 - Theory-constrained method SID=4 (vs PC=14, GES=12, NOTEARS=14)
-- F1=0.73, significantly outperforming pure data-driven approaches
+- F1=0.846, significantly outperforming pure data-driven approaches
 - Successfully identified 5 biologically meaningful bridge symptoms
 
 **Experiment 2 (Cusp Fitting)** ✅ Final version
@@ -626,10 +626,6 @@ mental-health-system/
 
 CuspNet provides a visual interactive interface based on React 19 + TypeScript, supporting real-time parameter adjustment, dynamic visualization, and end-to-end demonstration of the three-layer architecture.
 
-**Home** | **Architecture** | **Interactive Demo**
-:---:|:---:|:---:
-![Home](backend/app/docs/1.png) | ![Architecture](backend/app/docs/2.png) | ![Demo](backend/app/docs/3.png)
-
 ### 8.1 Page Architecture
 
 | Page | Route | Function |
@@ -645,10 +641,14 @@ CuspNet provides a visual interactive interface based on React 19 + TypeScript, 
 - Data flow pipeline visualization: Symptom Questionnaire → Causal Network → Cusp Parameters → Depression Level
 - Tech stack overview: 3-Layer Fusion / CoVe+SC+RS / Qwen3.5-2B
 
+![Home](backend/app/docs/1.png)
+
 **Core Architecture Page (Architecture)**
 - **Layer 1 Causal Discovery**: ECharts force-directed graph renders causal DAG in real-time, node size reflects centrality, edge width reflects causal strength; supports dual mode of backend API real-time data and local default data
 - **Layer 2 Cusp Dynamics**: Potential function V(x) rendered in real-time, annotating healthy state (green), depressed state (pink), saddle point (orange) three fixed points; stress/resilience sliders interactively adjust Cusp parameters, observing bistable-to-monostable transition in real-time
 - **Layer 3 LLM Cognitive Assessment**: Lazarus appraisal flow visualization (Primary → Secondary → Reappraisal → Distortion), CoVe/Self-Critique/Risk-Sensitive technique metric progress bars
+
+![Architecture](backend/app/docs/2.png)
 
 **Interactive Demo Page (Demo)**
 - Real-time interaction of potential function V(x) = ax⁴/4 + bx²/2 + cx: three sliders control a (stability), b (bifurcation parameter), c (asymmetry factor) respectively
@@ -656,6 +656,8 @@ CuspNet provides a visual interactive interface based on React 19 + TypeScript, 
 - Animation mode: One-click playback of continuous evolution of b from -3 → +3, intuitively observing the critical bifurcation process
 - Quick presets: Bistable / Monostable / Critical bifurcation / Offset bistable four typical scenarios with one-click switching
 - API/local dual mode: Uses real CuspNet data when backend online, automatically switches to local numerical computation when offline
+
+![Demo](backend/app/docs/3.png)
 
 ### 8.3 Technical Implementation
 

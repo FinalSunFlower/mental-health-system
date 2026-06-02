@@ -240,10 +240,10 @@ $$
 
 每一项的心理学含义：
 - $a_i + b_i x_i - c_i x_i^3$：Scheffer 的 Cusp 分岔（个体动力学）
-- $A_{ij} \cdot \sigma(x_j - \tau_j)$：Borsboom 的因果交互（症状间传播）
-- 当 $A_{ij} > 0$ 且 $x_j > \tau_j$：症状 j "激活"了对症状 i 的因果影响
+- Aᵢⱼ × σ(xⱼ − τⱼ)：Borsboom 的因果交互（症状间传播）
+- 当 Aᵢⱼ ＞ 0 且 xⱼ ＞ τⱼ：症状 j "激活"了对症状 i 的因果影响
 
-**关键理论结果**：正反馈回路（$A_{ij} \cdot A_{ji} > 0$ 的环）会**加深病理吸引盆**，直接对应 Luo Minmin (2026) 的核心预测——"多尺度正反馈维持病理吸引子"。
+**关键理论结果**：正反馈回路（Aᵢⱼ × Aⱼᵢ ＞ 0 的环）会**加深病理吸引盆**，直接对应 Luo Minmin (2026) 的核心预测——"多尺度正反馈维持病理吸引子"。
 
 ### 创新点 3：韧性储备的解析量化——从定性理论到定量预测
 
@@ -830,10 +830,6 @@ mental-health-system/
 
 CuspNet 提供基于 React 19 + TypeScript 的可视化交互界面，支持实时参数调节、动力学可视化和三层架构的端到端演示。
 
-**首页** | **核心架构** | **交互Demo**
-:---:|:---:|:---:
-![首页](backend/app/docs/1.png) | ![核心架构](backend/app/docs/2.png) | ![交互Demo](backend/app/docs/3.png)
-
 ### 8.1 页面架构
 
 | 页面 | 路由 | 功能 |
@@ -849,10 +845,14 @@ CuspNet 提供基于 React 19 + TypeScript 的可视化交互界面，支持实�
 - 数据流管线可视化：症状问卷 → 因果网络 → Cusp 参数 → 抑郁等级
 - 技术栈概览：3 层融合 / CoVe+SC+RS / Qwen3.5-2B
 
+![首页](backend/app/docs/1.png)
+
 **核心架构页（Architecture）**
 - **Layer 1 因果发现**：ECharts 力导向图实时渲染因果 DAG，节点大小反映中心性，边宽度反映因果强度；支持后端 API 实时数据与本地默认数据双模式
 - **Layer 2 Cusp 动力学**：势函数 V(x) 实时绘制，标注健康态（绿色）、抑郁态（粉色）、鞍点（橙色）三个不动点；压力/韧性滑块可交互调节 Cusp 参数，实时观察双稳态→单稳态转变
 - **Layer 3 LLM 认知评估**：Lazarus 评价流可视化（Primary → Secondary → Reappraisal → Distortion），CoVe/Self-Critique/Risk-Sensitive 技术指标进度条
+
+![核心架构](backend/app/docs/2.png)
 
 **交互Demo页（Demo）**
 - 势函数 V(x) = ax⁴/4 + bx²/2 + cx 的实时交互：三个滑块分别控制 a（稳定性）、b（分岔参数）、c（不对称因子）
@@ -860,6 +860,8 @@ CuspNet 提供基于 React 19 + TypeScript 的可视化交互界面，支持实�
 - 动画模式：一键播放 b 从 -3 → +3 的连续演化，直观观察临界分岔过程
 - 快速预设：双稳态 / 单稳态 / 临界分岔 / 偏移双稳 四种典型场景一键切换
 - API/本地双模式：后端在线时使用真实 CuspNet 数据，离线时自动切换本地数值计算
+
+![交互Demo](backend/app/docs/3.png)
 
 ### 8.3 技术实现
 
@@ -1117,9 +1119,8 @@ python run_exp5.py
 |--------|--------|---------|---------|
 | Sachs 蛋白质网络 | Sachs et al. (2005) | 公开学术数据 | 需引用原论文 |
 | DAIC-WOZ | USC/CMU | [官网申请](https://dcapsule.com/daic-woz/) | **需签署DUA** |
-| eRisk | JHU | [官网申请](https://erisk.2021.taln.upf.es/) | **需签署协议** |
+| eRisk | CLEF | [官网申请](https://early.irlab.org/) | **需签署协议** |
 | NHANES | CDC | [公开下载](https://wwwn.cdc.gov/nchs/nhanes/) | 公共领域 |
-| Reddit 自抓取 | Reddit API | 自行申请 API Key | 遵守 ToS |
 
 ### 免责声明
 
