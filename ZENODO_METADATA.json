@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "title": "When External Knowledge Should Abstain: Risk-Controlled Evidence Projection for Causal Orientation",
+    "upload_type": "publication",
+    "publication_type": "preprint",
+    "publication_date": "2026-08-24",
+    "creators": [
+      {
+        "name": "Jiang, Luchang",
+        "orcid": "0009-0004-4579-4243"
+      }
+    ],
+    "description": "<p>Background knowledge can orient an observational graph, but a confident expert or database can still be wrong. This preprint introduces risk-controlled evidence projection (RCEP), a fail-closed interface with separate source-risk and structural-write contracts. A source is admitted only when a held-out proposal gate certifies its accepted error; admitted proposals may reorient only data-supported pairs, and a total-order projection guarantees acyclicity.</p><p>In synthetic corruption experiments, RCEP improves directed F1 by a mean paired gain of 0.096 in informative-confidence conditions; across all 24 conditions, the mean paired gain is 0.053 and the worst-condition gain is 0. The release includes reproducible implementation code, editable vector figures, locked result artifacts, input provenance, and tests. The controlled estimands are accepted-proposal error and deterministic structural invariants under the stated calibration assumptions.</p><p>This is a preprint and has not undergone peer review.</p>",
+    "keywords": [
+      "causal discovery",
+      "background knowledge",
+      "risk control",
+      "selective prediction",
+      "DAG learning",
+      "finite-sample inference"
+    ],
+    "access_right": "open",
+    "license": "CC-BY-4.0",
+    "language": "eng",
+    "version": "1.0",
+    "notes": "The release does not redistribute third-party raw benchmark inputs. See DATA_AVAILABILITY.md and REPRODUCE.md. The paper-specific companion implementation is maintained at https://github.com/FinalSunFlower/mental-health-system/tree/rcep-preprint."
+  }
+}

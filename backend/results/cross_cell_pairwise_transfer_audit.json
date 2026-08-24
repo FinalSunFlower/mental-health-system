@@ -1,0 +1,566 @@
+{
+  "protocol": {
+    "dataset": "CausalBench / Weissmann K562 day-6 to RPE1 day-7",
+    "task": "cross-cell pairwise detectable intervention-response transfer",
+    "candidate_population": "replicated K562/HepG2 ChIP TF-target pairs frozen before response extraction",
+    "source_split": "fixed 10/5 TF-disjoint calibration/test split before gate fitting",
+    "data_support": "RPE1 control absolute Pearson correlation >= 0.05",
+    "source_context": "exp23 K562 day-6/day-8 encoder fit excluding every candidate source/target endpoint and all pair labels",
+    "source_proposal": "K562 detectable pair response direction source -> target with K562-only strength",
+    "evidence_semantics": "detectable_response",
+    "evidence_route": "risk_controlled",
+    "certificate_estimand": "accepted RPE1 detectable pair-response error",
+    "target_error": 0.2,
+    "claim_boundary": "a positive RPE1 label identifies an assay-specific total-effect direction under targeted perturbation; it does not establish direct adjacency, absence of an edge, or complete DAG recovery",
+    "no_test_label_use": "RPE1 pair labels are used only for held-out evaluation after source-group split and for calibration TFs"
+  },
+  "input_metadata": {
+    "candidate_source_sha256": "4a65c926684497ddd3fbdb81db4bc646c6ea5e0674a3555f3a8fb00aa2c31718",
+    "k562_label_sha256": "93d275108e83007cded468d20c07bc091ddd5a17837c22a0fa7b40004fbfae6c",
+    "rpe1_label_sha256": "0b262d79f36d75ad4fc9979c9da5dd5abff5e7443b1407bdb86a989bd022995d",
+    "k562_subset_sha256": "367395b4c5801aa3047d1f66394ee580f4109ac12d114a13edc48506f6885ed0",
+    "rpe1_subset_sha256": "694a4a75fbccd5273e89979db0d85a04069a98318dc19c919385b6f0f4ac7dee",
+    "candidate_protocol": {
+      "protocol": "K562/HepG2 replicated ChIP pairs selected before intervention-response extraction",
+      "seed": 20260912,
+      "n_sources": 15,
+      "targets_per_source": 100,
+      "sources": [
+        "TARDBP",
+        "SIN3A",
+        "PCBP1",
+        "USF2",
+        "MAX",
+        "TBP",
+        "PRPF4",
+        "YY1",
+        "HNRNPL",
+        "MYC",
+        "SP2",
+        "GABPA",
+        "RBM39",
+        "XRCC5",
+        "HNRNPC"
+      ],
+      "selection": {
+        "source_present_as_intervention_and_measured_in_both_cell_lines": true,
+        "target_measured_in_both_cell_lines": true,
+        "minimum_k562_cells_for_source": 50,
+        "minimum_rpe1_cells_for_source": 50,
+        "rank": "minimum of K562 and HepG2 ChIP weight; source rank by minimum intervention-cell count then candidate count",
+        "uses_intervention_response_labels": false
+      },
+      "inputs": {
+        "k562_chip_sha256": "e01017e486523e0974031ba3cdb7001bdfced3f4a25507b4cc089b389ef4a90c",
+        "hepg2_chip_sha256": "bb59e9cb77683a16eec06bfcc972d15014ca403ffef7a5292c51186eafb1a630",
+        "k562_metadata_sha256": "1fd85ad69591eb144267ffcc371a40d65b155a884c0c22d9401478372e795ee4",
+        "rpe1_metadata_sha256": "d854a0183fd62d7afb98827e9545c575e9e6f979b6a30e6b80caed310ab5f279"
+      },
+      "pair_csv_sha256": "4a65c926684497ddd3fbdb81db4bc646c6ea5e0674a3555f3a8fb00aa2c31718"
+    },
+    "k562_sampling": {
+      "targets_per_source": 100,
+      "cells_per_source": 50,
+      "control_cells": 300,
+      "source_ranking": "intervention_count",
+      "fixed_sources": [
+        "TARDBP",
+        "SIN3A",
+        "PCBP1",
+        "USF2",
+        "MAX",
+        "TBP",
+        "PRPF4",
+        "YY1",
+        "HNRNPL",
+        "MYC",
+        "SP2",
+        "GABPA",
+        "RBM39",
+        "XRCC5",
+        "HNRNPC"
+      ]
+    },
+    "rpe1_sampling": {
+      "targets_per_source": 100,
+      "cells_per_source": 40,
+      "control_cells": 200,
+      "source_ranking": "intervention_count",
+      "fixed_sources": [
+        "TARDBP",
+        "SIN3A",
+        "PCBP1",
+        "USF2",
+        "MAX",
+        "TBP",
+        "PRPF4",
+        "YY1",
+        "HNRNPL",
+        "MYC",
+        "SP2",
+        "GABPA",
+        "RBM39",
+        "XRCC5",
+        "HNRNPC"
+      ],
+      "range_workers": 64
+    }
+  },
+  "split": {
+    "calibration_sources": [
+      "GABPA",
+      "HNRNPC",
+      "HNRNPL",
+      "MAX",
+      "MYC",
+      "RBM39",
+      "SIN3A",
+      "TARDBP",
+      "XRCC5",
+      "YY1"
+    ],
+    "test_sources": [
+      "PCBP1",
+      "PRPF4",
+      "SP2",
+      "TBP",
+      "USF2"
+    ],
+    "source_sets_disjoint": true
+  },
+  "gate_certificate": {
+    "status": "abstain_no_certified_threshold",
+    "selected": {
+      "score_family": null,
+      "threshold": 1.0,
+      "accepted": 0,
+      "errors": 0,
+      "empirical_error": 1.0,
+      "simultaneous_error_upper": 1.0,
+      "feasible": false
+    },
+    "target_error": 0.2,
+    "failure_probability": 0.05,
+    "multiplicity_correction": "bonferroni_over_fixed_score_family_and_threshold_family",
+    "adjusted_alpha": 0.0015625,
+    "n_calibration": 1000,
+    "score_families": [
+      "source",
+      "product",
+      "geomean",
+      "min"
+    ],
+    "threshold_diagnostics": [
+      {
+        "score_family": "source",
+        "threshold": 0.0001,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "source",
+        "threshold": 0.001,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "source",
+        "threshold": 0.0025,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "source",
+        "threshold": 0.005,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "source",
+        "threshold": 0.01,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "source",
+        "threshold": 0.02,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "source",
+        "threshold": 0.05,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "source",
+        "threshold": 0.1,
+        "accepted": 17,
+        "errors": 16,
+        "empirical_error": 0.9411764705882353,
+        "simultaneous_error_upper": 0.9999080205847081,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.0001,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.001,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.0025,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.005,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.01,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.02,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.05,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "product",
+        "threshold": 0.1,
+        "accepted": 5,
+        "errors": 5,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.0001,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.001,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.0025,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.005,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.01,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.02,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.05,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "geomean",
+        "threshold": 0.1,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.0001,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.001,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.0025,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.005,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.01,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.02,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.05,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      },
+      {
+        "score_family": "min",
+        "threshold": 0.1,
+        "accepted": 6,
+        "errors": 6,
+        "empirical_error": 1.0,
+        "simultaneous_error_upper": 1.0,
+        "feasible": false
+      }
+    ],
+    "assumption": "independent calibration and deployment proposals with exchangeable source/context score pairs",
+    "estimand": "accepted contextual proposal error"
+  },
+  "summary": {
+    "n_pairs": 1500,
+    "n_calibration_pairs": 1000,
+    "n_test_pairs": 500,
+    "n_k562_detectable_pairs": 37,
+    "n_rpe1_detectable_pairs": 87,
+    "n_cross_cell_replicated_detectable_pairs": 5,
+    "test_score": {
+      "average_precision": 0.075625,
+      "roc_auc": 0.5206330128205128
+    },
+    "accepted": {
+      "n": 0,
+      "coverage": 0.0,
+      "precision": null,
+      "empirical_error": null
+    },
+    "positive_direction": {
+      "n_data_supported_rpe1_positive_pairs": 18,
+      "data_only_accuracy": 0.6666666666666666,
+      "rcep_accuracy": 0.6666666666666666,
+      "rcep_delta_vs_data": 0.0,
+      "rcep_harm_fraction_vs_data": 0.0
+    },
+    "support_violations": 0,
+    "fail_closed_equals_data_only": true
+  },
+  "source_group_sensitivity": {
+    "folds": [
+      {
+        "fold": 0,
+        "calibration_sources": [
+          "HNRNPC",
+          "HNRNPL",
+          "PCBP1",
+          "PRPF4",
+          "RBM39",
+          "SP2",
+          "TARDBP",
+          "TBP",
+          "USF2",
+          "YY1"
+        ],
+        "test_sources": [
+          "GABPA",
+          "MAX",
+          "MYC",
+          "SIN3A",
+          "XRCC5"
+        ],
+        "gate_status": "abstain_no_certified_threshold",
+        "accepted_coverage": 0.0,
+        "test_score": {
+          "average_precision": 0.05,
+          "roc_auc": 0.4957894736842105
+        },
+        "n_test_positive": 25
+      },
+      {
+        "fold": 1,
+        "calibration_sources": [
+          "GABPA",
+          "MAX",
+          "MYC",
+          "PCBP1",
+          "PRPF4",
+          "SIN3A",
+          "SP2",
+          "TBP",
+          "USF2",
+          "XRCC5"
+        ],
+        "test_sources": [
+          "HNRNPC",
+          "HNRNPL",
+          "RBM39",
+          "TARDBP",
+          "YY1"
+        ],
+        "gate_status": "abstain_no_certified_threshold",
+        "accepted_coverage": 0.0,
+        "test_score": {
+          "average_precision": 0.06,
+          "roc_auc": 0.4978723404255319
+        },
+        "n_test_positive": 30
+      },
+      {
+        "fold": 2,
+        "calibration_sources": [
+          "GABPA",
+          "HNRNPC",
+          "HNRNPL",
+          "MAX",
+          "MYC",
+          "RBM39",
+          "SIN3A",
+          "TARDBP",
+          "XRCC5",
+          "YY1"
+        ],
+        "test_sources": [
+          "PCBP1",
+          "PRPF4",
+          "SP2",
+          "TBP",
+          "USF2"
+        ],
+        "gate_status": "abstain_no_certified_threshold",
+        "accepted_coverage": 0.0,
+        "test_score": {
+          "average_precision": 0.075625,
+          "roc_auc": 0.5206330128205128
+        },
+        "n_test_positive": 32
+      }
+    ],
+    "all_folds_abstain": true,
+    "maximum_accepted_coverage": 0.0
+  }
+}

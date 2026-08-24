@@ -1,0 +1,13 @@
+{
+  "artifact": "backend/results/cuspnet_strict_core_20260816_212521.json",
+  "sha256": "FA8DAB28FF7090DBEBAE25E76B98035DAE3A366DB791C82CE819892DC3727D66",
+  "generated_at": "2026-08-17T22:30:52",
+  "purpose": "Submission figures, tables, and alignment audits must use this exact artifact.",
+  "supplemental_artifacts": [
+    {
+      "artifact": "backend/results/cross_cell_pairwise_transfer_audit.json",
+      "sha256": "62BCC5801FC724443F5683D5186EDE1F4B23C6567D3DDCC108532F1887EB94CB",
+      "purpose": "Frozen TF-disjoint cross-cell pairwise boundary audit cited in the manuscript limitations and results."
+    }
+  ]
+}

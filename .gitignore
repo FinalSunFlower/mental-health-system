@@ -1,0 +1,14 @@
+# Never commit downloaded benchmark inputs or generated caches.
+data/
+backend/data/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+paper/__pycache__/
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out

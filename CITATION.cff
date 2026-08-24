@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "When External Knowledge Should Abstain: Risk-Controlled Evidence Projection for Causal Orientation"
+type: article
+authors:
+  - family-names: Jiang
+    given-names: Luchang
+    orcid: "https://orcid.org/0009-0004-4579-4243"
+    email: auroral.sunflower@gmail.com
+abstract: "A fail-closed, finite-sample admission interface for allowing external knowledge to reorient only data-supported pairs in causal discovery."
+keywords:
+  - causal discovery
+  - background knowledge
+  - risk control
+  - selective prediction
+  - DAG learning
+license: CC-BY-4.0
+version: 1.0
+date-released: 2026-08-24
+url: "https://orcid.org/0009-0004-4579-4243"
+repository-code: "https://github.com/FinalSunFlower/mental-health-system/tree/rcep-preprint"
