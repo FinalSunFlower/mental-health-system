@@ -1,5 +1,7 @@
 # Never commit downloaded benchmark inputs or generated caches.
 data/
+!backend/app/data/
+!backend/app/data/**
 backend/data/
 backend/**/__pycache__/
 backend/**/*.pyc
