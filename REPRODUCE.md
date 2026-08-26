@@ -26,13 +26,12 @@ as passing data tests.
 
 ```powershell
 python paper/make_figures.py
-cd paper
-latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 ```
 
-This produces `paper/main.pdf` from the public preprint source. The generated
-PDF/SVG figures are deterministic functions of `paper/RESULTS_LOCK.json` and
-the hash-pinned artifact in `backend/results/`.
+The generated PDF/SVG figures are deterministic functions of
+`paper/RESULTS_LOCK.json` and the hash-pinned artifact in `backend/results/`.
+The editable manuscript source and submission PDF are distributed through the
+associated Zenodo release rather than this code-only branch.
 
 ## Full Experiment Regeneration
 
